@@ -38,11 +38,11 @@ export function StreakHero() {
         aria-label={t("home.todayHabitsAria", { pct })}
       >
         <defs>
-          {/* The theme tokens, not the old bright hex pair: the app runs on a cream
-              ground and the darkened ember/amber are the ones that hold up on it. */}
+          {/* Owner preference (2026-08-05): back to the original bright pair over
+              the darkened theme tokens, on this ring specifically. */}
           <linearGradient id="streak-hero-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="var(--color-ember)" />
-            <stop offset="100%" stopColor="var(--color-amber)" />
+            <stop offset="0%" stopColor="#FF6A3D" />
+            <stop offset="100%" stopColor="#FFB020" />
           </linearGradient>
         </defs>
         <circle
@@ -66,9 +66,7 @@ export function StreakHero() {
           initial={{ strokeDashoffset: CIRCUMFERENCE }}
           animate={{ strokeDashoffset: offset }}
           transition={{ duration: 1.2, ease: "easeInOut" }}
-          style={{
-            filter: "drop-shadow(0 0 6px color-mix(in srgb, var(--color-ember) 35%, transparent))",
-          }}
+          style={{ filter: "drop-shadow(0 0 6px rgba(255,106,61,0.35))" }}
         />
       </svg>
 
