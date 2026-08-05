@@ -9,7 +9,7 @@ interface HabitRowProps {
   habit: Habit;
   days: string[]; // the month's ISO days, in order
   streak: number;
-  completion: number; // 0..1 over the month
+  completion: number; // 0..1 over the month's elapsed days, see useHabits.completionRate
   isDone: (date: string) => boolean;
   onToggle: (date: string) => void;
   onDelete: () => void;
@@ -17,6 +17,16 @@ interface HabitRowProps {
 
 // One habit: a sticky left label (dot + name + flame + % + delete) followed by
 // a binary toggle cell per day. The label stays put while the days scroll.
+//
+// Day cells and their gap are hard px, NOT rem: they are a fixed-count grid (31
+// columns), so scaling them with the 18px root font size pushed the widest month
+// past the viewport and brought back horizontal scroll. Everything else in the
+// app still scales. HabitMonthGrid's header numbers use the same two constants.
+//
+// Budget at a 1440px window (18px root):
+//   1440 - 15 scrollbar - 270 sidebar (w-60) - 108 main px-12 = ~1047 usable
+//   1047 - 252 label (w-56) - 4 pl = 791 for the days
+//   31 cells * 21 + 30 gaps * 4 = 651 + 120 = 771 <= 791, ~20px to spare.
 export function HabitRow({
   habit,
   days,
@@ -45,7 +55,7 @@ export function HabitRow({
         <DeleteButton itemName={habit.name} onConfirm={onDelete} className="shrink-0" />
       </div>
 
-      <div className="flex gap-1 py-1.5 pl-1">
+      <div className="flex gap-[4px] py-1.5 pl-[4px]">
         {days.map((d) => {
           const done = isDone(d);
           const future = d > today;
@@ -60,7 +70,7 @@ export function HabitRow({
                 (done ? ` (${t("common.completed")})` : "")
               }
               className={cn(
-                "size-7 shrink-0 rounded-md border transition-colors",
+                "size-[21px] shrink-0 rounded-md border transition-colors",
                 done
                   ? "border-transparent bg-mint hover:bg-mint/90"
                   : "border-border/60 bg-transparent hover:bg-muted",

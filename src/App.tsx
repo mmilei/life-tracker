@@ -38,8 +38,10 @@ function App() {
         <Sidebar items={TABS} value={tab} onChange={setTab} className="sticky top-0" />
         <main className="flex-1 overflow-x-hidden px-8 py-8 lg:px-12">
           {/* NOTE: rem, not px, so the reading column scales with the root font
-              size like everything inside it. 93.75rem is the old 1500px cap
-              expressed against the 16px default. */}
+              size like everything inside it. 93.75rem came from a 1500px cap at
+              the 16px default; at the current 18px root it resolves to 1687px,
+              and that is on purpose. The cap is meant to follow the scale, not
+              to pin a pixel width. */}
           <div className="mx-auto w-full max-w-[93.75rem]">
             {tab === "week" ? (
               <WeekTab />
