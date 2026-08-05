@@ -116,5 +116,14 @@
   }
   html {
     @apply font-sans;
+    /*
+      NOTE: single scale knob for the whole app. Every size in the project is a
+      Tailwind rem utility, so raising the root from the 16px default lifts
+      type, padding, gaps and widths together. The app read as too small on the
+      owner's 1440p screen and worse on a 4K Mac.
+      Breakpoints are unaffected: rem inside a media query always resolves
+      against the initial 16px, not this override, so sm/md/lg stay put.
+    */
+    font-size: 18px;
   }
 }

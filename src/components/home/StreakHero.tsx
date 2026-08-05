@@ -7,8 +7,11 @@ import { todayISO } from "@/lib/dates";
 // Adapted from KokonutUI's Apple Activity Card: its hardcoded MOVE/EXERCISE/STAND
 // rings are replaced by a single ring of today's habit-completion %, Ember→Amber
 // (the "heat" metaphor), with StreakFlame at the center. Reuses only the SVG ring math.
-const SIZE = 200;
-const STROKE = 16;
+// NOTE: SVG geometry is px and does not follow the root font size, so these two
+// were bumped 12.5% by hand to keep the ring in proportion with the rem-sized
+// number and caption stacked inside it. They are the only px in this file.
+const SIZE = 225;
+const STROKE = 18;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = RADIUS * 2 * Math.PI;
 

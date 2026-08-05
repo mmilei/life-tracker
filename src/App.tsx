@@ -37,7 +37,10 @@ function App() {
       <div className="flex min-h-dvh">
         <Sidebar items={TABS} value={tab} onChange={setTab} className="sticky top-0" />
         <main className="flex-1 overflow-x-hidden px-8 py-8 lg:px-12">
-          <div className="mx-auto w-full max-w-[1500px]">
+          {/* NOTE: rem, not px, so the reading column scales with the root font
+              size like everything inside it. 93.75rem is the old 1500px cap
+              expressed against the 16px default. */}
+          <div className="mx-auto w-full max-w-[93.75rem]">
             {tab === "week" ? (
               <WeekTab />
             ) : tab === "habits" ? (

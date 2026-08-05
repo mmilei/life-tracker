@@ -58,7 +58,10 @@ export function AddNoteDialog({ noteTypes, defaultTypeId, onAdd }: AddNoteDialog
         setOpen(o);
       }}
     >
-      <DialogTrigger render={<Button variant="outline" className="w-full" />}>
+      {/* Secondary, not outline nor ghost: the coloured outline competed with
+          the board for attention, and ghost went so quiet it could not be
+          found. A soft filled surface with no coloured border sits between. */}
+      <DialogTrigger render={<Button variant="secondary" className="w-full" />}>
         <Plus />
         {defaultTypeId === "lead" ? t("business.addLead") : t("business.addNote")}
       </DialogTrigger>
