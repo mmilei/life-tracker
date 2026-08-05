@@ -4,7 +4,23 @@
 //   node scripts/check-leads.mjs
 import assert from "node:assert/strict";
 
-const { cleanLead, contactLink, isOverdue, phoneDigits } = await import("../src/lib/leads.ts");
+const {
+  cleanLead,
+  contactLink,
+  isOverdue,
+  phoneDigits,
+  FIXED_FIRST_STAGE,
+  FIXED_LAST_STAGE,
+  MAX_STAGES,
+  addStage,
+  canAddStage,
+  migrateSources,
+  nameTaken,
+  reassignStage,
+  removeStage,
+  renameStage,
+  sourceLabel,
+} = await import("../src/lib/leads.ts");
 
 let checks = 0;
 const check = (name, fn) => {
@@ -100,6 +116,101 @@ check("cleanLead trims values and drops the empty ones", () => {
 check("an all-empty form stores nothing at all", () => {
   assert.equal(cleanLead({}), undefined);
   assert.equal(cleanLead({ name: "", contact: "   ", nextStepDate: undefined }), undefined);
+});
+
+// -------------------------------------------------------------------- stages
+// A board is always the two fixed stages plus whatever the user added between
+// them. Every check below builds one with `pipeline(n)` middles.
+const FIXED_ONLY = [{ id: FIXED_FIRST_STAGE }, { id: FIXED_LAST_STAGE }];
+const pipeline = (middles) =>
+  Array.from({ length: middles }).reduce((stages, _, i) => addStage(stages, `Etapa ${i + 1}`), FIXED_ONLY);
+const ids = (stages) => stages.map((s) => s.id);
+
+check("the fixed stages stay at both ends no matter how many are in between", () => {
+  for (const middles of [0, 1, 4]) {
+    const stages = pipeline(middles);
+    assert.equal(stages.length, middles + 2, `lost a stage with ${middles} middles`);
+    assert.equal(stages[0].id, FIXED_FIRST_STAGE, `first stage moved with ${middles} middles`);
+    assert.equal(
+      stages[stages.length - 1].id,
+      FIXED_LAST_STAGE,
+      `closing stage moved with ${middles} middles`,
+    );
+  }
+});
+
+check("a new stage lands before the closing one, never at the end", () => {
+  const stages = addStage(pipeline(2), "Presupuesto");
+  assert.equal(stages[stages.length - 1].id, FIXED_LAST_STAGE, "the new stage was appended after Cerrado");
+  assert.equal(stages[stages.length - 2].label, "Presupuesto", "the new stage is not the last editable slot");
+});
+
+check("deleting a stage sends its leads to the FIRST stage, not the closing one", () => {
+  const stages = pipeline(2);
+  const doomed = stages[1].id;
+  const survivor = stages[2].id;
+  const left = removeStage(stages, doomed);
+  assert.equal(left.length, stages.length - 1, "the stage was not removed");
+  assert.equal(reassignStage(doomed, left), FIXED_FIRST_STAGE, "an orphaned lead did not go back to the first stage");
+  assert.equal(reassignStage(survivor, left), survivor, "a lead in a surviving stage was moved anyway");
+  assert.equal(reassignStage(undefined, left), FIXED_FIRST_STAGE, "a lead with no stage did not get one");
+});
+
+check("renaming a stage keeps its id, so no lead has to be rewritten", () => {
+  const stages = pipeline(2);
+  const target = stages[1].id;
+  const renamed = renameStage(stages, target, "Visita a obra");
+  assert.deepEqual(ids(renamed), ids(stages), "renaming changed an id: every lead in that stage is now orphaned");
+  assert.equal(renamed[1].label, "Visita a obra", "the label was not updated");
+  assert.equal(reassignStage(target, renamed), target, "a lead in the renamed stage was moved");
+});
+
+check("the fixed stages refuse both deletion and renaming", () => {
+  const stages = pipeline(2);
+  for (const fixed of [FIXED_FIRST_STAGE, FIXED_LAST_STAGE]) {
+    assert.deepEqual(removeStage(stages, fixed), stages, `${fixed} was deleted`);
+    assert.deepEqual(renameStage(stages, fixed, "Otra cosa"), stages, `${fixed} was renamed`);
+  }
+});
+
+check("the board stops at six stages", () => {
+  const full = pipeline(MAX_STAGES - 2);
+  assert.equal(full.length, MAX_STAGES, "could not fill the board up to the cap");
+  assert.equal(canAddStage(full), false, "the cap is not reported as reached");
+  assert.deepEqual(addStage(full, "Una más"), full, "a seventh stage got in");
+  assert.equal(canAddStage(pipeline(MAX_STAGES - 3)), true, "one slot short of the cap should still accept a stage");
+});
+
+// The fixed stages are stored under Spanish ids but rendered from the
+// dictionary, so the duplicate check has to run on what is on screen. In
+// English "New" is a free id and a taken label at the same time.
+check("a name already on screen is taken, whatever the stored id says", () => {
+  const onScreen = ["New", "Contacted", "Closed"];
+  assert.equal(nameTaken(onScreen, "New"), true, "the visible label of a fixed stage was allowed twice");
+  assert.equal(nameTaken(onScreen, "  contacted  "), true, "case and padding should not smuggle a duplicate in");
+  assert.equal(nameTaken(onScreen, "Nuevo"), false, "the stored id is not what the user sees, so it is free");
+  assert.equal(nameTaken([], "Anything"), false, "nothing is taken on an empty list");
+});
+
+// ------------------------------------------------------------------- sources
+const SEEDED = ["Referido", "Showroom", "Instagram"].map((label) => ({ id: label, label }));
+
+check("migrating free-text sources adopts the unknown ones and duplicates nothing", () => {
+  const once = migrateSources(SEEDED, ["Referido", "Feria de la construcción", undefined, "  ", "Referido"]);
+  assert.deepEqual(
+    once.map((s) => s.id),
+    [...SEEDED.map((s) => s.id), "Feria de la construcción"],
+    "a seeded source was duplicated, or the typed one was dropped",
+  );
+  const twice = migrateSources(once, ["Referido", "Feria de la construcción"]);
+  assert.deepEqual(twice, once, "migration is not idempotent: it grows on every load");
+});
+
+check("a source id that is not in the list still renders as its own text", () => {
+  assert.equal(sourceLabel(SEEDED, "Referido"), "Referido");
+  assert.equal(sourceLabel(SEEDED, "Un vecino"), "Un vecino", "an old free-text lead lost its source on screen");
+  assert.equal(sourceLabel(SEEDED, undefined), undefined, "a lead with no source should render nothing");
+  assert.equal(sourceLabel(SEEDED, "   "), undefined);
 });
 
 console.log(`check-leads: OK, ${checks} checks`);

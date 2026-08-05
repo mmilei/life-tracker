@@ -4,6 +4,7 @@ import { StreakHero } from "./StreakHero";
 import { KpiPinGrid } from "./KpiPinGrid";
 import { WeeklySummaryCard } from "./WeeklySummaryCard";
 import { TodayChecklist } from "./TodayChecklist";
+import { LeadSourcesCard } from "./LeadSourcesCard";
 import { BackupControls } from "./BackupControls";
 import { GitHubSyncPanel } from "./GitHubSyncPanel";
 
@@ -22,9 +23,14 @@ export function HomeTab() {
       <StreakHero />
       <KpiPinGrid />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* Three summary panels in one band. Last on purpose: the week rating and
+          today's habits are what the owner opens the app for, the lead mix is
+          context. At two columns it would leave a hole in the second row, so it
+          takes the full width there and only becomes a third column at lg. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <WeeklySummaryCard />
         <TodayChecklist />
+        <LeadSourcesCard />
       </div>
 
       <BackupControls />

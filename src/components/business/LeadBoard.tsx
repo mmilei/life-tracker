@@ -1,29 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CircleDashed, TriangleAlert } from "lucide-react";
 import type { Note } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DeleteButton } from "@/components/common/DeleteButton";
 import { EditLeadDialog } from "./EditLeadDialog";
-import { isOverdue } from "@/lib/leads";
+import { isOverdue, reassignStage, sourceLabel, stageLabel } from "@/lib/leads";
 import { formatDayLong, todayISO } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-import { useT } from "@/store/AppStore";
-
-// Fixed 4-stage sales pipeline for the app's owner, who works in sales. Not
-// spelled out in the original spec, chosen as the simplest pipeline that fits
-// the app's "leads" note type. Stored verbatim in Note.status; the first
-// stage is the default.
-export const LEAD_STATUSES = ["Nuevo", "Contactado", "Negociando", "Cerrado"] as const;
-
-// The stored values above are stable ids, never translated. This maps each id to
-// the i18n key used for its visible label.
-export const LEAD_STATUS_KEYS: Record<(typeof LEAD_STATUSES)[number], string> = {
-  Nuevo: "business.leadNew",
-  Contactado: "business.leadContacted",
-  Negociando: "business.leadNegotiating",
-  Cerrado: "business.leadClosed",
-};
+import { useAppStore } from "@/store/AppStore";
 
 // Column width for a stage that has leads in it. Empty stages get no width and
 // collapse to their own header.
@@ -31,6 +17,10 @@ export const LEAD_STATUS_KEYS: Record<(typeof LEAD_STATUSES)[number], string> = 
 // there, the top of the 340-360px the owner asked for. Do not restate it in px:
 // the scale is already applied by the root font size.
 const COLUMN_WIDTH = "w-80";
+
+// The "no filter" chip value. Safe as a sentinel because a source id is always a
+// trimmed non-empty string, so it can never collide with a real one.
+const ALL_SOURCES = "";
 
 interface LeadBoardProps {
   leads: Note[];
@@ -60,7 +50,7 @@ function LeadCard({
   onUpdate: LeadBoardProps["onUpdate"];
   onRemove: LeadBoardProps["onRemove"];
 }) {
-  const t = useT();
+  const { t, leadConfig } = useAppStore();
   const details = lead.lead;
   const name = details?.name?.trim();
   // Leads created before LeadDetails existed have no name: their text is the title.
@@ -68,7 +58,9 @@ function LeadCard({
   const nextStep = details?.nextStep?.trim();
   const date = details?.nextStepDate;
   const overdue = isOverdue(date, today);
-  const source = details?.source?.trim();
+  // Free text typed before the source list existed still shows itself: that
+  // fallback lives in sourceLabel, not here.
+  const source = sourceLabel(leadConfig.sources, details?.source);
 
   return (
     <li
@@ -130,9 +122,9 @@ function LeadCard({
           aria-label={t("business.stageOf", { name: title })}
           className="h-7 rounded-lg border border-input bg-transparent px-1.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
         >
-          {LEAD_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {t(LEAD_STATUS_KEYS[s])}
+          {leadConfig.stages.map((s) => (
+            <option key={s.id} value={s.id}>
+              {stageLabel(s, t)}
             </option>
           ))}
         </select>
@@ -149,24 +141,44 @@ function LeadCard({
   );
 }
 
-// Leads grouped by pipeline stage, one column per stage. A leftover or unknown
-// status falls back into the first stage.
+// Leads grouped by pipeline stage, one column per stage. A leftover status, or
+// one of a stage the user deleted, falls back into the first stage.
 export function LeadBoard({ leads, onUpdate, onRemove }: LeadBoardProps) {
-  const t = useT();
+  const { t, leadConfig } = useAppStore();
+  const { stages, sources } = leadConfig;
   const today = todayISO();
-  const byStatus = useMemo(() => {
-    const groups: Record<string, Note[]> = Object.fromEntries(
-      LEAD_STATUSES.map((s) => [s, [] as Note[]]),
-    );
+  // Board-local on purpose: a filter that survived a reload would hide leads
+  // from an owner who no longer remembers turning it on.
+  const [sourceFilter, setSourceFilter] = useState(ALL_SOURCES);
+
+  // Only sources that actually have leads get a chip: an empty chip is a dead
+  // button, and the seeded list is longer than what any single owner uses.
+  const chips = useMemo(() => {
+    const counts = new Map<string, number>();
     for (const lead of leads) {
-      const status =
-        lead.status && (LEAD_STATUSES as readonly string[]).includes(lead.status)
-          ? lead.status
-          : LEAD_STATUSES[0];
-      groups[status].push(lead);
+      const id = lead.lead?.source?.trim();
+      if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
     }
+    return sources
+      .filter((s) => counts.has(s.id))
+      .map((s) => ({ id: s.id, label: s.label, count: counts.get(s.id)! }));
+  }, [leads, sources]);
+
+  const visible = useMemo(
+    () =>
+      sourceFilter === ALL_SOURCES
+        ? leads
+        : leads.filter((lead) => lead.lead?.source?.trim() === sourceFilter),
+    [leads, sourceFilter],
+  );
+
+  const byStage = useMemo(() => {
+    const groups: Record<string, Note[]> = Object.fromEntries(
+      stages.map((s) => [s.id, [] as Note[]]),
+    );
+    for (const lead of visible) groups[reassignStage(lead.status, stages)].push(lead);
     return groups;
-  }, [leads]);
+  }, [visible, stages]);
 
   if (leads.length === 0) {
     return (
@@ -175,42 +187,79 @@ export function LeadBoard({ leads, onUpdate, onRemove }: LeadBoardProps) {
   }
 
   return (
-    // The board scrolls sideways, the cards never compress. Every column is
-    // shrink-0, so the row overflows instead of squeezing, and overflow-x-auto
-    // puts the scrollbar on this container rather than on the page body.
-    // Nothing here counts the stages: two of them or nine lay out the same way.
-    <div className="flex items-start gap-4 overflow-x-auto pb-2">
-      {LEAD_STATUSES.map((status) => {
-        const items = byStatus[status];
-        return (
-          <Card
-            key={status}
-            size="sm"
-            // NOTE: an empty stage gets no width, so it collapses to its header
-            // and stops spending board space on nothing.
-            className={cn("shrink-0 gap-3 px-4", items.length > 0 && COLUMN_WIDTH)}
+    <div className="flex flex-col gap-4">
+      {/* No chip row when nothing carries a source: a lone "All" chip filters
+          nothing and still costs a row of vertical space. */}
+      {chips.length > 0 && (
+        <ToggleGroup
+          value={[sourceFilter]}
+          onValueChange={(v) => v.length > 0 && setSourceFilter(v[0] as string)}
+          variant="outline"
+          size="sm"
+          className="max-w-full flex-wrap"
+        >
+          <ToggleGroupItem
+            value={ALL_SOURCES}
+            aria-label={t("business.sourceFilterAria", {
+              name: t("business.sourceFilterAll"),
+            })}
+            // Bold on the active chip, so the selection survives a screen where
+            // the muted background is hard to tell apart from the card.
+            className="aria-pressed:font-semibold"
           >
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-medium whitespace-nowrap">{t(LEAD_STATUS_KEYS[status])}</h3>
-              <Badge variant="outline">{items.length}</Badge>
-            </div>
-            {items.length > 0 && (
-              <ul className="flex flex-col gap-3">
-                {items.map((lead) => (
-                  <LeadCard
-                    key={lead.id}
-                    lead={lead}
-                    status={status}
-                    today={today}
-                    onUpdate={onUpdate}
-                    onRemove={onRemove}
-                  />
-                ))}
-              </ul>
-            )}
-          </Card>
-        );
-      })}
+            {t("business.sourceFilterAll")}
+          </ToggleGroupItem>
+          {chips.map((chip) => (
+            <ToggleGroupItem
+              key={chip.id}
+              value={chip.id}
+              aria-label={t("business.sourceFilterAria", { name: chip.label })}
+              className="aria-pressed:font-semibold"
+            >
+              {chip.label}
+              <span className="text-muted-foreground tabular-nums">{chip.count}</span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      )}
+
+      {/* The board scrolls sideways, the cards never compress. Every column is
+          shrink-0, so the row overflows instead of squeezing, and overflow-x-auto
+          puts the scrollbar on this container rather than on the page body.
+          Nothing here counts the stages: two of them or six lay out the same way. */}
+      <div className="flex items-start gap-4 overflow-x-auto pb-2">
+        {stages.map((stage) => {
+          const items = byStage[stage.id];
+          return (
+            <Card
+              key={stage.id}
+              size="sm"
+              // NOTE: an empty stage gets no width, so it collapses to its header
+              // and stops spending board space on nothing.
+              className={cn("shrink-0 gap-3 px-4", items.length > 0 && COLUMN_WIDTH)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-medium whitespace-nowrap">{stageLabel(stage, t)}</h3>
+                <Badge variant="outline">{items.length}</Badge>
+              </div>
+              {items.length > 0 && (
+                <ul className="flex flex-col gap-3">
+                  {items.map((lead) => (
+                    <LeadCard
+                      key={lead.id}
+                      lead={lead}
+                      status={stage.id}
+                      today={today}
+                      onUpdate={onUpdate}
+                      onRemove={onRemove}
+                    />
+                  ))}
+                </ul>
+              )}
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

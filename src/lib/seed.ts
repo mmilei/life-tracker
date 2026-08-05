@@ -1,4 +1,5 @@
-import type { Habit, LifeArea, MuscleGroup, NoteType } from "@/types";
+import type { Habit, LeadSource, LeadStage, LifeArea, MuscleGroup, NoteType } from "@/types";
+import { FIXED_FIRST_STAGE, FIXED_LAST_STAGE } from "@/lib/leads";
 import { todayISO } from "@/lib/dates";
 import { DEFAULT_LANG, type Lang } from "@/lib/i18n";
 
@@ -49,3 +50,33 @@ export const seedNoteTypes = (lang: Lang = DEFAULT_LANG): NoteType[] => [
 
 export const seedMuscleGroups = (lang: Lang = DEFAULT_LANG): MuscleGroup[] =>
   MUSCLE_GROUPS[lang].map((name) => ({ id: crypto.randomUUID(), name }));
+
+// The two stages the app owns get no label: they are translated at render time
+// from the dictionary. The middle two are seeded in the chosen language and are
+// the user's from then on: renaming them is a rename, not a translation.
+//
+// Their ids are the Spanish strings in EVERY language on purpose: Note.status
+// has been storing exactly those since before stages were configurable, so any
+// other id would orphan the leads already on the board.
+const MIDDLE_STAGES: Record<Lang, string[]> = {
+  es: ["Contactado", "Negociando"],
+  en: ["Contacted", "Negotiating"],
+};
+const MIDDLE_STAGE_IDS = ["Contactado", "Negociando"];
+
+export const seedLeadStages = (lang: Lang = DEFAULT_LANG): LeadStage[] => [
+  { id: FIXED_FIRST_STAGE },
+  ...MIDDLE_STAGE_IDS.map((id, i) => ({ id, label: MIDDLE_STAGES[lang][i] })),
+  { id: FIXED_LAST_STAGE },
+];
+
+// Sources seed as id === label for the same reason: leads created while `source`
+// was free text stored the visible string, so seeding by label makes those leads
+// match the seeded source instead of spawning a duplicate.
+const SOURCES: Record<Lang, string[]> = {
+  es: ["Referido", "Showroom", "Instagram", "Web", "Arquitecto o estudio", "Obra en curso"],
+  en: ["Referral", "Showroom", "Instagram", "Website", "Architect or studio", "Job site"],
+};
+
+export const seedLeadSources = (lang: Lang = DEFAULT_LANG): LeadSource[] =>
+  SOURCES[lang].map((label) => ({ id: label, label }));

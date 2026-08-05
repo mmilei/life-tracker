@@ -4,11 +4,14 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AddNoteDialog } from "./AddNoteDialog";
 import { NoteList } from "./NoteList";
 import { LeadBoard } from "./LeadBoard";
+import { LeadListsDialog } from "./LeadListsDialog";
 
 export function BusinessTab() {
   const { notes, t } = useAppStore();
   const { notes: allNotes, noteTypes, leads, addNote, updateNote, removeNote } = notes;
-  const [view, setView] = useState<"notes" | "leads">("notes");
+  // Leads open the tab: it is the view the owner works in every day, notes are
+  // the occasional one.
+  const [view, setView] = useState<"notes" | "leads">("leads");
 
   const plainNotes = useMemo(() => allNotes.filter((n) => n.typeId !== "lead"), [allNotes]);
   // Dialog preselects: first non-lead type in the Notas view, 'lead' in Leads.
@@ -33,19 +36,26 @@ export function BusinessTab() {
         variant="outline"
         className="w-full"
       >
-        <ToggleGroupItem value="notes" className="flex-1">
-          {t("business.notes")}
-        </ToggleGroupItem>
         <ToggleGroupItem value="leads" className="flex-1">
           {t("business.leads")}
         </ToggleGroupItem>
+        <ToggleGroupItem value="notes" className="flex-1">
+          {t("business.notes")}
+        </ToggleGroupItem>
       </ToggleGroup>
 
-      <AddNoteDialog
-        noteTypes={noteTypes}
-        defaultTypeId={view === "leads" ? "lead" : firstNoteTypeId}
-        onAdd={addNote}
-      />
+      {/* Actions sit on one row and take only the width of their labels: at full
+          width the add button read as a grey bar competing with the board.
+          Managing stages and sources belongs to the pipeline, so it only shows
+          in the Leads view. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <AddNoteDialog
+          noteTypes={noteTypes}
+          defaultTypeId={view === "leads" ? "lead" : firstNoteTypeId}
+          onAdd={addNote}
+        />
+        {view === "leads" && <LeadListsDialog />}
+      </div>
 
       {view === "notes" ? (
         <NoteList notes={plainNotes} noteTypes={noteTypes} onRemove={removeNote} />

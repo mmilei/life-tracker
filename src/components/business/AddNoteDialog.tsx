@@ -13,10 +13,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { LEAD_STATUSES, LEAD_STATUS_KEYS } from "./LeadBoard";
 import { LeadFields } from "./LeadFields";
-import { cleanLead } from "@/lib/leads";
-import { useT } from "@/store/AppStore";
+import { cleanLead, reassignStage, stageLabel } from "@/lib/leads";
+import { useAppStore, useT } from "@/store/AppStore";
 
 interface AddNoteDialogProps {
   noteTypes: NoteType[];
@@ -30,21 +29,28 @@ interface AddNoteDialogProps {
 // plain note textarea.
 export function AddNoteDialog({ noteTypes, defaultTypeId, onAdd }: AddNoteDialogProps) {
   const t = useT();
+  const { leadConfig } = useAppStore();
   const [open, setOpen] = useState(false);
   const [typeId, setTypeId] = useState(defaultTypeId);
   const [text, setText] = useState("");
-  const [status, setStatus] = useState<string>(LEAD_STATUSES[0]);
+  // "" means "whatever the first stage is". The picked value is resolved against
+  // the live stage list on every render, so an empty start and a stage deleted
+  // from the lists dialog while this form is open both fall back to the first
+  // stage instead of leaving a dangling id selected.
+  const [status, setStatus] = useState("");
   const [lead, setLead] = useState<LeadDetails>({});
 
+  const stages = leadConfig.stages;
+  const stage = reassignStage(status, stages);
   const isLead = typeId === "lead";
   // A lead is identified by its name, a note by its text, either one is enough.
   const canSave = Boolean(typeId) && Boolean(text.trim() || (isLead && lead.name?.trim()));
 
   function submit() {
     if (!canSave) return;
-    onAdd(typeId, text.trim(), isLead ? status : undefined, isLead ? cleanLead(lead) : undefined);
+    onAdd(typeId, text.trim(), isLead ? stage : undefined, isLead ? cleanLead(lead) : undefined);
     setText("");
-    setStatus(LEAD_STATUSES[0]);
+    setStatus("");
     setLead({});
     setOpen(false);
   }
@@ -60,8 +66,10 @@ export function AddNoteDialog({ noteTypes, defaultTypeId, onAdd }: AddNoteDialog
     >
       {/* Secondary, not outline nor ghost: the coloured outline competed with
           the board for attention, and ghost went so quiet it could not be
-          found. A soft filled surface with no coloured border sits between. */}
-      <DialogTrigger render={<Button variant="secondary" className="w-full" />}>
+          found. A soft filled surface with no coloured border sits between.
+          No w-full: stretched edge to edge it read as a grey bar across the
+          screen rather than as a button. */}
+      <DialogTrigger render={<Button variant="secondary" />}>
         <Plus />
         {defaultTypeId === "lead" ? t("business.addLead") : t("business.addNote")}
       </DialogTrigger>
@@ -99,14 +107,14 @@ export function AddNoteDialog({ noteTypes, defaultTypeId, onAdd }: AddNoteDialog
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs text-muted-foreground">{t("business.stage")}</span>
                 <ToggleGroup
-                  value={[status]}
+                  value={[stage]}
                   onValueChange={(v) => v[0] && setStatus(v[0])}
                   variant="outline"
                   className="flex-wrap"
                 >
-                  {LEAD_STATUSES.map((s) => (
-                    <ToggleGroupItem key={s} value={s} className="px-3">
-                      {t(LEAD_STATUS_KEYS[s])}
+                  {stages.map((s) => (
+                    <ToggleGroupItem key={s.id} value={s.id} className="px-3">
+                      {stageLabel(s, t)}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>

@@ -9,6 +9,8 @@ export const STORAGE_KEYS = {
   workouts: "lt.workouts",
   noteTypes: "lt.noteTypes",
   notes: "lt.notes",
+  leadStages: "lt.leadStages",
+  leadSources: "lt.leadSources",
   homePins: "lt.homePins",
   lang: "lt.lang",
 } as const;
