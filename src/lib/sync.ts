@@ -4,12 +4,63 @@
 // (Node strips the types), so anything that pulls in React or `@/` aliases has
 // to live in src/lib/sync-engine.ts instead.
 //
-// The remote file is a single JSON object in a private repo of the user:
-//   { "updatedAt": "<ISO>", "data": { "lt.habits": …, "lt.notes": … } }
-// `data` is exactly what exportBackup() produces, so a synced file can also be
-// fed to the existing manual import.
+// The remote state is one JSON file per domain, inside a folder of a private
+// repo of the user:
+//   { "updatedAt": "<ISO>", "data": { "lt.habits": …, "lt.habitLogs": … } }
+// Each `data` is the slice of exportBackup() that belongs to that domain, so a
+// synced file is still a valid (partial) manual import. One file per domain
+// means two devices editing different tabs never write the same file, and each
+// tab gets its own commit history.
 
-export const DEFAULT_PATH = "life-tracker-state.json";
+// cfg.path is the FOLDER the domain files live in. "" is the repo root, which
+// is also where the pre-split single file lived, so nothing has to move.
+export const DEFAULT_FOLDER = "";
+
+// The single file this app used before the split. Still read (once, to migrate)
+// and never written or deleted: removing it is a separate, manual decision.
+export const LEGACY_FILE = "life-tracker-state.json";
+
+// Which storage keys travel in which file. Position of the map is the push
+// order; the grouping is by tab, because that is the unit a device edits at a
+// time. lt.lang and lt.homePins belong to no single tab, so they share home.json.
+//
+// TRADEOFF: a key that is not listed here does not sync at all. That is a step
+// back from isBackupKey()'s prefix rule (storage.ts), which exists so an older
+// build forwards keys it does not understand instead of deleting them. The
+// guard is the coverage assert in scripts/check-sync.mjs: adding a backup key
+// without a home here breaks the check at dev time, loudly, before it ships.
+// Upgrade path if that is ever not enough: a catch-all file for unmapped keys.
+export const DOMAIN_FILES: Record<string, readonly string[]> = {
+  "habits.json": ["lt.habits", "lt.habitLogs"],
+  "week.json": ["lt.lifeAreas", "lt.weeklyRatings"],
+  "training.json": ["lt.muscleGroups", "lt.workouts"],
+  "business.json": ["lt.noteTypes", "lt.notes", "lt.leadStages", "lt.leadSources"],
+  "home.json": ["lt.lang", "lt.homePins"],
+};
+
+export const DOMAIN_FILE_NAMES = Object.keys(DOMAIN_FILES);
+
+const KEY_TO_FILE = new Map<string, string>(
+  Object.entries(DOMAIN_FILES).flatMap(([file, keys]) => keys.map((k) => [k, file] as const)),
+);
+
+// null = this key does not travel: a device preference, a secret, or a backup
+// key nobody mapped (see the TRADEOFF above).
+export function domainOf(storageKey: string): string | null {
+  return KEY_TO_FILE.get(storageKey) ?? null;
+}
+
+// One backup object in, one object per domain file out. Every file is present
+// even when empty, so a push always writes a complete, self-describing file.
+export function splitBackup(data: Record<string, unknown>): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const file of DOMAIN_FILE_NAMES) out[file] = {};
+  for (const [key, value] of Object.entries(data)) {
+    const file = domainOf(key);
+    if (file) out[file][key] = value;
+  }
+  return out;
+}
 
 // These two keys live under lt.sync on purpose. The backup no longer ships a
 // fixed list of keys, it ships every lt.* key except the excluded prefixes, so
@@ -23,7 +74,7 @@ const LAST_SYNCED_KEY = "lt.sync.lastSyncedAt";
 export interface SyncConfig {
   token: string;
   repo: string; // "owner/repo"
-  path: string; // path of the JSON file inside the repo
+  path: string; // folder the domain files live in, "" for the repo root
 }
 
 export interface SyncPayload {
@@ -33,7 +84,10 @@ export interface SyncPayload {
 
 export interface RemoteFile {
   payload: SyncPayload;
-  sha: string; // required by the API to overwrite the file
+  // Required by the API to overwrite a file. null when the payload did not come
+  // from a file of its own: the migration reads the old single file and hands
+  // each domain its slice, and those slices still have to be created.
+  sha: string | null;
 }
 
 export type SyncErrorCode = "auth" | "notFound" | "conflict" | "corrupt" | "network" | "unknown";
@@ -56,6 +110,17 @@ export function statusToCode(status: number): SyncErrorCode {
 
 const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 
+// A folder, from whatever the user typed or whatever an older build saved. A
+// value ending in .json is a file path from before the split, so it resolves to
+// the folder that file was in: an existing config keeps pointing at the same
+// place in the repo without the user re-entering anything.
+export function normalizeFolder(input: string): string {
+  const clean = input.trim().replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!/\.json$/i.test(clean)) return clean;
+  const cut = clean.lastIndexOf("/");
+  return cut === -1 ? DEFAULT_FOLDER : clean.slice(0, cut);
+}
+
 // Accepts what a human actually pastes (a full GitHub URL, a leading slash on
 // the path) and returns null when the result still isn't usable.
 export function normalizeConfig(input: Partial<SyncConfig> | null | undefined): SyncConfig | null {
@@ -65,7 +130,7 @@ export function normalizeConfig(input: Partial<SyncConfig> | null | undefined): 
     .replace(/^https?:\/\/github\.com\//, "")
     .replace(/\.git$/, "")
     .replace(/\/+$/, "");
-  const path = (input?.path ?? "").trim().replace(/^\/+/, "") || DEFAULT_PATH;
+  const path = normalizeFolder(input?.path ?? "");
   if (!token || !REPO_RE.test(repo)) return null;
   return { token, repo, path };
 }
@@ -87,12 +152,35 @@ export function clearConfig(): void {
   localStorage.removeItem(LAST_SYNCED_KEY);
 }
 
-export function getLastSyncedAt(): string | null {
-  return localStorage.getItem(LAST_SYNCED_KEY);
+// One marker per domain file, in one storage key. A device can be up to date on
+// habits.json and behind on business.json, and each file decides on its own.
+function readSyncedMap(): Record<string, string> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LAST_SYNCED_KEY) ?? "null") as unknown;
+    // Anything else (including the bare ISO string this key held before the
+    // split) reads as "never synced": every file then adopts once, and adopting
+    // is a merge, so no data rides on getting this back.
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, string>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
-export function setLastSyncedAt(iso: string): void {
-  localStorage.setItem(LAST_SYNCED_KEY, iso);
+export function getLastSyncedAt(file: string): string | null {
+  const value = readSyncedMap()[file];
+  return typeof value === "string" ? value : null;
+}
+
+export function setLastSyncedAt(file: string, iso: string): void {
+  localStorage.setItem(LAST_SYNCED_KEY, JSON.stringify({ ...readSyncedMap(), [file]: iso }));
+}
+
+// Newest marker across the files. The status line shows one time, not five.
+export function latestSyncedAt(): string | null {
+  const all = Object.values(readSyncedMap()).filter((v) => typeof v === "string");
+  return all.length ? all.reduce((a, b) => (a > b ? a : b)) : null; // ISO sorts chronologically
 }
 
 // btoa() throws on anything above U+00FF and this app is full of "hábitos" and
@@ -246,8 +334,13 @@ export function mergeBackups(
   return merged;
 }
 
-function contentsUrl(cfg: SyncConfig): string {
-  const path = cfg.path.split("/").map(encodeURIComponent).join("/");
+// Contents API path = the configured folder plus the file name. Empty segments
+// are dropped so a root folder ("") does not produce a double slash.
+export function contentsUrl(cfg: SyncConfig, file: string): string {
+  const path = [...cfg.path.split("/"), file]
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join("/");
   return `https://api.github.com/repos/${cfg.repo}/contents/${path}`;
 }
 
@@ -267,9 +360,9 @@ async function request(url: string, init: RequestInit): Promise<Response> {
   }
 }
 
-// null = the file doesn't exist yet (first sync ever).
-export async function fetchRemote(cfg: SyncConfig): Promise<RemoteFile | null> {
-  const res = await request(contentsUrl(cfg), { headers: headers(cfg.token) });
+// null = that file doesn't exist yet (first sync ever, or a domain never used).
+export async function fetchRemote(cfg: SyncConfig, file: string): Promise<RemoteFile | null> {
+  const res = await request(contentsUrl(cfg, file), { headers: headers(cfg.token) });
   if (res.status === 404) return null;
   if (!res.ok) throw new SyncError(statusToCode(res.status));
   const json = (await res.json()) as { content?: string; sha?: string } | unknown[];
@@ -282,14 +375,15 @@ export async function fetchRemote(cfg: SyncConfig): Promise<RemoteFile | null> {
 // sha is required to overwrite; omitting it only works for a create.
 export async function pushRemote(
   cfg: SyncConfig,
+  file: string,
   payload: SyncPayload,
   sha: string | null,
 ): Promise<string | null> {
-  const res = await request(contentsUrl(cfg), {
+  const res = await request(contentsUrl(cfg, file), {
     method: "PUT",
     headers: { ...headers(cfg.token), "Content-Type": "application/json" },
     body: JSON.stringify({
-      message: `life-tracker sync ${payload.updatedAt}`,
+      message: `life-tracker sync ${file} ${payload.updatedAt}`,
       content: encodePayload(payload),
       ...(sha ? { sha } : {}),
     }),
