@@ -34,6 +34,13 @@ export function useLeadConfig(lang: Lang, leadSourceValues: (string | undefined)
     });
   }, [leadSourceValues, setSources]);
 
+  // A sync merge can bring Cerrado back from the end of the array instead of
+  // the end where it belongs (see leads.normalizeStages). Repairs itself once
+  // per load; a no-op when the order was already fine.
+  useEffect(() => {
+    setStages((prev) => leads.normalizeStages(prev));
+  }, [setStages]);
+
   const addStage = useCallback(
     (label: string) => setStages((prev) => leads.addStage(prev, label)),
     [setStages],

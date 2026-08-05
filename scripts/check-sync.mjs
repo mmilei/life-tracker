@@ -236,6 +236,22 @@ check("mergeBackups never drops an entry it cannot identify", () => {
   );
 });
 
+// Regression for 2026-08-05: a stage that existed only on the merging device
+// used to land after Cerrado, because the entity merge has no notion that
+// this array has fixed endpoints. leadStages/leadSources are excluded from it
+// entirely, so the whole-file rule (remote wins) applies instead.
+check("mergeBackups does not reorder leadStages or leadSources: whole-file rule applies", () => {
+  const local = {
+    "lt.leadStages": [{ id: "Nuevo" }, { id: "Negociando", label: "Presupuestadisimo" }, { id: "Cerrado" }],
+  };
+  const remote = {
+    "lt.leadStages": [{ id: "Nuevo" }, { id: "Contactado", label: "Contactadisimo" }, { id: "Cerrado" }],
+  };
+  const merged = mergeBackups(local, remote);
+  assert.deepEqual(merged["lt.leadStages"], remote["lt.leadStages"], "remote array wins whole, not entity by entity");
+  assert.equal(merged["lt.leadStages"].at(-1).id, "Cerrado", "Cerrado is still last");
+});
+
 // ------------------------------------------------------------------ HTTP codes
 check("statusToCode maps the statuses the UI has copy for", () => {
   assert.equal(statusToCode(401), "auth");

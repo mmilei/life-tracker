@@ -16,6 +16,7 @@ const {
   canAddStage,
   migrateSources,
   nameTaken,
+  normalizeStages,
   reassignStage,
   removeStage,
   renameStage,
@@ -143,6 +144,36 @@ check("a new stage lands before the closing one, never at the end", () => {
   const stages = addStage(pipeline(2), "Presupuesto");
   assert.equal(stages[stages.length - 1].id, FIXED_LAST_STAGE, "the new stage was appended after Cerrado");
   assert.equal(stages[stages.length - 2].label, "Presupuesto", "the new stage is not the last editable slot");
+});
+
+// Regression for 2026-08-05: a sync merge (see check-sync.mjs) could leave
+// Cerrado in the middle of the array. There is no reorder UI, so this is the
+// only thing that puts it back.
+check("normalizeStages repairs Nuevo/Cerrado to first/last without touching the rest", () => {
+  const scrambled = [
+    { id: "Contactado", label: "Contactadisimo" },
+    { id: FIXED_LAST_STAGE },
+    { id: "Negociando", label: "Presupuestadisimo" },
+    { id: FIXED_FIRST_STAGE },
+  ];
+  const fixed = normalizeStages(scrambled);
+  assert.equal(fixed[0].id, FIXED_FIRST_STAGE, "Nuevo is not first");
+  assert.equal(fixed.at(-1).id, FIXED_LAST_STAGE, "Cerrado is not last");
+  assert.deepEqual(
+    fixed.slice(1, -1).map((s) => s.id),
+    ["Contactado", "Negociando"],
+    "the relative order of the user's own stages changed",
+  );
+});
+
+check("normalizeStages returns the exact same array when the order is already correct", () => {
+  const ok = pipeline(2);
+  assert.equal(normalizeStages(ok), ok, "reordered an array that needed no repair");
+});
+
+check("normalizeStages leaves an array with no fixed stages alone", () => {
+  const noFixed = [{ id: "a" }, { id: "b" }];
+  assert.equal(normalizeStages(noFixed), noFixed, "touched an array it has nothing safe to anchor on");
 });
 
 check("deleting a stage sends its leads to the FIRST stage, not the closing one", () => {

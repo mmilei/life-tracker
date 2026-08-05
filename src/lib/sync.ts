@@ -211,6 +211,17 @@ function mergeEntities(storageKey: string, local: unknown[], remote: unknown[]):
   return [...out.values()];
 }
 
+// leadStages and leadSources are excluded from the entity merge below on
+// purpose. They are the one array in this app where POSITION is meaning, not
+// just membership: Nuevo/Cerrado must stay first/last (src/lib/leads.ts).
+// Entity-by-entity union has no notion of that, and a stage that exists only
+// on the merging device lands at the end, past Cerrado. Seen live 2026-08-05.
+// Plain replace is safe here specifically because `dirty` (sync-engine.ts)
+// gates every adopt: this only runs when the device has no unpushed writes,
+// so there is nothing local-only to lose by taking the remote array whole,
+// same as any non-array value.
+const NO_ENTITY_MERGE = new Set(["lt.leadStages", "lt.leadSources"]);
+
 // Union of two backups, entity by entity, used when adopting a remote file.
 // Replacing the whole file used to delete anything this device had and the
 // remote didn't: a habit created offline, a log ticked on the phone.
@@ -230,7 +241,7 @@ export function mergeBackups(
   for (const key of Object.keys(merged)) {
     const l = local[key];
     const r = remote[key];
-    if (Array.isArray(l) && Array.isArray(r)) merged[key] = mergeEntities(key, l, r);
+    if (Array.isArray(l) && Array.isArray(r) && !NO_ENTITY_MERGE.has(key)) merged[key] = mergeEntities(key, l, r);
   }
   return merged;
 }
