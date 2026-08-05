@@ -1,18 +1,12 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useT } from "@/store/AppStore";
+import { HABIT_COLORS } from "@/lib/seed";
 import { cn } from "@/lib/utils";
 
-// Swatches: warm accent first, then a few extras so habits look distinct.
-const SWATCHES = [
-  "#FF6A3D", // ember
-  "#FFB020", // amber
-  "#3ECF8E", // mint
-  "#6E7BFF", // iris
-  "#E5484D", // red
-  "#8B5CF6", // violet
-  "#EC4899", // pink
-  "#9AA0B4", // muted
-];
+// The offered swatches are the seed palette itself: one array, so what a habit is
+// born with and what the user can repaint it with can never drift apart. Why those
+// eight values and what they replaced is documented where they are declared.
+const SWATCHES = HABIT_COLORS;
 
 // Chip-picker for a single hex color, per the plan (ToggleGroup type single).
 // Base UI ToggleGroup is always array-valued; single-select == guard the empty case.
@@ -26,6 +20,10 @@ export function ColorPicker({
   className?: string;
 }) {
   const t = useT();
+  // A habit painted before this palette existed keeps its color: appending it
+  // instead of dropping it means the picker still shows something selected, and
+  // the user is the one who decides whether to move to a current swatch.
+  const swatches = !value || SWATCHES.includes(value) ? SWATCHES : [...SWATCHES, value];
   return (
     <ToggleGroup
       value={[value]}
@@ -33,7 +31,7 @@ export function ColorPicker({
       spacing={2}
       className={cn("flex-wrap", className)}
     >
-      {SWATCHES.map((c) => (
+      {swatches.map((c) => (
         <ToggleGroupItem
           key={c}
           value={c}

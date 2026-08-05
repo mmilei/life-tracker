@@ -8,8 +8,8 @@ import { LeadSourcesCard } from "./LeadSourcesCard";
 import { BackupControls } from "./BackupControls";
 import { GitHubSyncPanel } from "./GitHubSyncPanel";
 
-// Home dashboard: summary of the other 4 tabs — today's streak, pinned
-// indicators (≤4), week snapshot, and today's habit checklist.
+// Home dashboard: summary of the other 4 tabs. Today's streak, pinned
+// indicators (up to 4), week snapshot, and today's habit checklist.
 export function HomeTab() {
   const t = useT();
 
@@ -17,7 +17,11 @@ export function HomeTab() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="font-display text-3xl font-semibold tracking-tight">{t("home.title")}</h1>
-        <p className="text-sm capitalize text-muted-foreground">{formatDayLong(todayISO())}</p>
+        {/* first-letter, not capitalize: CSS capitalize uppercases every word, so
+            a Spanish date came out "5 De Agosto" instead of "5 de agosto". */}
+        <p className="text-sm text-muted-foreground first-letter:uppercase">
+          {formatDayLong(todayISO())}
+        </p>
       </header>
 
       <StreakHero />

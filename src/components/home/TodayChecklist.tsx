@@ -13,7 +13,7 @@ export function TodayChecklist() {
 
   return (
     <Card size="sm" className="gap-3 px-4">
-      <span className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {t("home.todayHabits")}
       </span>
 
@@ -34,7 +34,9 @@ export function TodayChecklist() {
                 >
                   <span
                     className={cn(
-                      "grid size-6 shrink-0 place-items-center rounded-md border transition-colors",
+                      // Circle, matching the month grid cell in HabitRow: ticking a
+                      // habit is one gesture and it should not have two shapes.
+                      "grid size-6 shrink-0 place-items-center rounded-full border transition-colors",
                       done
                         ? "border-transparent bg-mint text-white"
                         : "border-border/60 hover:bg-muted",

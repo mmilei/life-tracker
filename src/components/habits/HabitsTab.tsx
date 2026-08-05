@@ -15,7 +15,11 @@ export function HabitsTab() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="font-display text-3xl font-semibold tracking-tight">{t("habits.title")}</h1>
-        <p className="text-sm text-muted-foreground capitalize">{monthLabel}</p>
+        {/* first-letter, not capitalize: toLocaleDateString returns "agosto de
+            2026" and capitalize would title-case the preposition too, printing
+            "Agosto De 2026". English months come back capitalised already, so
+            this is a no-op there. */}
+        <p className="text-sm text-muted-foreground first-letter:uppercase">{monthLabel}</p>
       </header>
 
       {habits.habits.length === 0 ? (

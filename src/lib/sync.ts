@@ -11,9 +11,12 @@
 
 export const DEFAULT_PATH = "life-tracker-state.json";
 
-// These two keys are deliberately NOT in STORAGE_KEYS (src/lib/storage.ts):
-// STORAGE_KEYS is what exportBackup() ships to the repo, and the token must
-// never end up inside the file we push.
+// These two keys live under lt.sync on purpose. The backup no longer ships a
+// fixed list of keys, it ships every lt.* key except the excluded prefixes, so
+// what keeps the token out of the file we push is isBackupKey() in
+// src/lib/storage.ts. Read the SECURITY note there before renaming either of
+// these: a key that stops matching lt.sync starts getting committed to the
+// user's repo.
 const CONFIG_KEY = "lt.sync.config";
 const LAST_SYNCED_KEY = "lt.sync.lastSyncedAt";
 

@@ -23,6 +23,11 @@ import { useAppStore, useT } from "@/store/AppStore";
 
 // A row in either list: read-only until the pencil is pressed, then an inline
 // input. Fixed rows say so instead of showing controls that do nothing.
+//
+// Density matters more here than anywhere else in the app: this is an admin list
+// of up to six stages plus every source, scanned rather than read, and at the
+// body size of the rest of the app it did not fit and forced the dialog to
+// scroll. Rows are kept to the height of one icon button and nothing more.
 function ListRow({
   label,
   fixed,
@@ -47,9 +52,10 @@ function ListRow({
 
   if (draft !== null) {
     return (
-      <li className="flex items-center gap-1.5">
+      <li className="flex min-h-7 items-center gap-1">
         <Input
           autoFocus
+          className="h-7"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -73,12 +79,15 @@ function ListRow({
   }
 
   return (
-    <li className="flex items-center gap-2">
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+    <li className="flex min-h-7 items-center gap-2">
+      <span className="min-w-0 truncate">{label}</span>
       {fixed ? (
-        <span className="text-xs text-muted-foreground">{t("business.stageFixed")}</span>
+        // The hint reads right after the name instead of in the action column:
+        // sharing that column with the pencil and the bin of every other row left
+        // the right edge ragged, a line of text against two buttons.
+        <span className="shrink-0 text-xs text-muted-foreground">{t("business.stageFixed")}</span>
       ) : (
-        <>
+        <span className="ms-auto flex shrink-0 items-center">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -89,7 +98,7 @@ function ListRow({
             <Pencil />
           </Button>
           <DeleteButton itemName={label} description={deleteDescription} onConfirm={onRemove} />
-        </>
+        </span>
       )}
     </li>
   );
@@ -98,6 +107,12 @@ function ListRow({
 // Input + button to append to a list. `note` is why the button is off, and it
 // is always rendered next to the disabled button: a greyed control with no
 // reason reads as a broken app.
+//
+// The button is an outlined "+" and not a filled one with its label: sharing the
+// row with the input, the label ate enough width to truncate the placeholder
+// ("Ej: Presupuestado, Muestra:"), which is the one piece of copy that explains
+// what to type. It also outweighed the rename and delete controls, which are the
+// actions actually used here. The label survives as the accessible name.
 function AddRow({
   placeholder,
   addLabel,
@@ -121,18 +136,25 @@ function AddRow({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-1.5">
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
         <Input
+          className="h-7"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder={placeholder}
           disabled={Boolean(note)}
         />
-        <Button size="sm" onClick={add} disabled={!allowed}>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label={addLabel}
+          title={addLabel}
+          onClick={add}
+          disabled={!allowed}
+        >
           <Plus />
-          {addLabel}
         </Button>
       </div>
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
@@ -161,7 +183,13 @@ export function LeadListsDialog(): React.JSX.Element {
         <SlidersHorizontal />
         {title}
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      {/* The scroll used to live on the popup itself, which is the element that
+          carries the radius: the bar was drawn inside the rounded corner and ate
+          it, and it pushed the only close button out of view. Header and footer
+          are fixed now and only the middle block scrolls, inside the padding.
+          One size wider than the default dialog, because every row here is a
+          name next to two controls and 24rem left nothing for the name. */}
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -169,55 +197,66 @@ export function LeadListsDialog(): React.JSX.Element {
           </DialogDescription>
         </DialogHeader>
 
-        <section className="flex flex-col gap-3">
-          <h3 className="font-medium">{t("business.stagesTitle")}</h3>
-          <ul className="flex flex-col gap-1.5">
-            {stages.map((stage) => (
-              <ListRow
-                key={stage.id}
-                label={stageLabel(stage, t)}
-                fixed={isFixedStage(stage.id)}
-                onRename={(label) => leadConfig.renameStage(stage.id, label)}
-                deleteDescription={t("business.stageDeleteConfirm", {
-                  name: stageLabel(stage, t),
-                  first: firstLabel,
-                })}
-                onRemove={() => leadConfig.removeStage(stage.id)}
-              />
-            ))}
-          </ul>
-          <AddRow
-            placeholder={t("business.stagePlaceholder")}
-            addLabel={t("business.stageAdd")}
-            note={atLimit ? t("business.stageLimit", { n: MAX_STAGES }) : undefined}
-            // Duplicate names would give the board two columns the user cannot
-            // tell apart, and there is no reorder to fix it afterwards.
-            canAdd={(name) => !atLimit && Boolean(name.trim()) && !nameTaken(stageNames, name)}
-            onAdd={leadConfig.addStage}
-          />
-        </section>
+        {/* Text one notch under the dialog body size: an admin list is scanned,
+            not read. -mx-1/px-1 so the focus ring of the first and last control
+            is not clipped by the scroll container. */}
+        <div
+          className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 text-[0.8125rem]"
+        >
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {t("business.stagesTitle")}
+            </h3>
+            <ul className="flex flex-col gap-0.5">
+              {stages.map((stage) => (
+                <ListRow
+                  key={stage.id}
+                  label={stageLabel(stage, t)}
+                  fixed={isFixedStage(stage.id)}
+                  onRename={(label) => leadConfig.renameStage(stage.id, label)}
+                  deleteDescription={t("business.stageDeleteConfirm", {
+                    name: stageLabel(stage, t),
+                    first: firstLabel,
+                  })}
+                  onRemove={() => leadConfig.removeStage(stage.id)}
+                />
+              ))}
+            </ul>
+            <AddRow
+              placeholder={t("business.stagePlaceholder")}
+              addLabel={t("business.stageAdd")}
+              note={atLimit ? t("business.stageLimit", { n: MAX_STAGES }) : undefined}
+              // Duplicate names would give the board two columns the user cannot
+              // tell apart, and there is no reorder to fix it afterwards.
+              canAdd={(name) => !atLimit && Boolean(name.trim()) && !nameTaken(stageNames, name)}
+              onAdd={leadConfig.addStage}
+            />
+          </section>
 
-        <section className="flex flex-col gap-3">
-          <h3 className="font-medium">{t("business.sourcesTitle")}</h3>
-          <p className="text-sm text-muted-foreground">{t("business.sourcesDescription")}</p>
-          <ul className="flex flex-col gap-1.5">
-            {sources.map((source) => (
-              <ListRow
-                key={source.id}
-                label={source.label}
-                onRename={(label) => leadConfig.renameSource(source.id, label)}
-                deleteDescription={t("business.sourceDeleteConfirm", { name: source.label })}
-                onRemove={() => leadConfig.removeSource(source.id)}
-              />
-            ))}
-          </ul>
-          <AddRow
-            placeholder={t("business.sourcePlaceholder")}
-            addLabel={t("business.sourceAdd")}
-            canAdd={(name) => Boolean(name.trim()) && !nameTaken(sourceNames, name)}
-            onAdd={leadConfig.addSource}
-          />
-        </section>
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {t("business.sourcesTitle")}
+            </h3>
+            <p className="text-xs text-muted-foreground">{t("business.sourcesDescription")}</p>
+            <ul className="flex flex-col gap-0.5">
+              {sources.map((source) => (
+                <ListRow
+                  key={source.id}
+                  label={source.label}
+                  onRename={(label) => leadConfig.renameSource(source.id, label)}
+                  deleteDescription={t("business.sourceDeleteConfirm", { name: source.label })}
+                  onRemove={() => leadConfig.removeSource(source.id)}
+                />
+              ))}
+            </ul>
+            <AddRow
+              placeholder={t("business.sourcePlaceholder")}
+              addLabel={t("business.sourceAdd")}
+              canAdd={(name) => Boolean(name.trim()) && !nameTaken(sourceNames, name)}
+              onAdd={leadConfig.addSource}
+            />
+          </section>
+        </div>
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>{t("common.done")}</DialogClose>

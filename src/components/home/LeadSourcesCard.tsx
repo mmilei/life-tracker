@@ -25,10 +25,16 @@ export function LeadSourcesCard(): React.JSX.Element {
   }, [notes.leads]);
 
   const total = notes.leads.length;
+  // Bars are a share of the leads that have a source, not a share of the leader.
+  // Scaling against the leader filled every bar to 100% whenever the sources were
+  // tied, which is the most common shape early on (one referral, one showroom) and
+  // exactly when the panel should be earning its space: identical full bars say
+  // nothing. Against the total the same data reads 50/50, which is both true and
+  // the question the panel asks, since "where they come from" is a proportion and
+  // the ranking is already carried by the order. Many sources do make short bars,
+  // but a stub with its count printed next to it is honest, and a full bar that
+  // lies is not.
   const withSource = ranked.reduce((sum, [, count]) => sum + count, 0);
-  // Bars scale against the leader, not against the total: with six sources every
-  // bar would be a stub and the ranking would be unreadable at this card width.
-  const top = ranked[0]?.[1] ?? 1;
 
   return (
     // The span lives here and not in HomeTab because the signature takes no
@@ -36,11 +42,11 @@ export function LeadSourcesCard(): React.JSX.Element {
     // there instead of leaving a hole, and lines up as a column at lg.
     <Card size="sm" className="gap-3 px-4 sm:col-span-2 lg:col-span-1">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {t("home.leadSources")}
         </span>
         {ranked.length > 0 && (
-          <Badge variant="secondary" className="font-display tabular-nums">
+          <Badge variant="secondary" className="tabular-nums">
             {t("home.leadSourcesCount", { n: withSource, total })}
           </Badge>
         )}
@@ -61,7 +67,7 @@ export function LeadSourcesCard(): React.JSX.Element {
               <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
                 <div
                   className="h-full rounded-full bg-ember"
-                  style={{ width: `${(count / top) * 100}%` }}
+                  style={{ width: `${(count / withSource) * 100}%` }}
                 />
               </div>
             </li>

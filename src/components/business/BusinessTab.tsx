@@ -23,32 +23,34 @@ export function BusinessTab() {
         <h1 className="font-display text-3xl font-semibold tracking-tight">
           {t("business.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {view === "notes"
-            ? t("business.notesCount", { n: plainNotes.length })
-            : t("business.leadsCount", { n: leads.length })}
-        </p>
       </header>
 
-      <ToggleGroup
-        value={[view]}
-        onValueChange={(v) => v[0] && setView(v[0] as "notes" | "leads")}
-        variant="outline"
-        className="w-full"
-      >
-        <ToggleGroupItem value="leads" className="flex-1">
-          {t("business.leads")}
-        </ToggleGroupItem>
-        <ToggleGroupItem value="notes" className="flex-1">
-          {t("business.notes")}
-        </ToggleGroupItem>
-      </ToggleGroup>
-
-      {/* Actions sit on one row and take only the width of their labels: at full
-          width the add button read as a grey bar competing with the board.
-          Managing stages and sources belongs to the pipeline, so it only shows
-          in the Leads view. */}
+      {/* One row for everything above the content: view switch, add, and list
+          management. Three stacked rows ate ~150px of height on a screen where
+          the board itself did not fit. flex-wrap lets them fall onto a second
+          row on their own when the window gets narrow, which is the only width
+          this app can count on.
+          Nothing here is w-full: the toggle is w-fit by default and forcing it
+          full width turned two labels into two huge grey bars. */}
       <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          value={[view]}
+          onValueChange={(v) => v[0] && setView(v[0] as "notes" | "leads")}
+          variant="outline"
+        >
+          {/* The count rides the toggle, same shape as the source chips on the
+              board. As a header subtitle it needed a plural rule the dictionary
+              does not have, and printed "1 leads". */}
+          <ToggleGroupItem value="leads">
+            {t("business.leads")}
+            <span className="text-muted-foreground tabular-nums">{leads.length}</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="notes">
+            {t("business.notes")}
+            <span className="text-muted-foreground tabular-nums">{plainNotes.length}</span>
+          </ToggleGroupItem>
+        </ToggleGroup>
+
         <AddNoteDialog
           noteTypes={noteTypes}
           defaultTypeId={view === "leads" ? "lead" : firstNoteTypeId}

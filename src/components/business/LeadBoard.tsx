@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { CircleDashed, TriangleAlert } from "lucide-react";
-import type { Note } from "@/types";
-import { Card } from "@/components/ui/card";
+import { ChevronRight, CircleDashed, TriangleAlert } from "lucide-react";
+import type { LeadStage, Note } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DeleteButton } from "@/components/common/DeleteButton";
 import { EditLeadDialog } from "./EditLeadDialog";
@@ -11,16 +11,29 @@ import { formatDayLong, todayISO } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/AppStore";
 
-// Column width for a stage that has leads in it. Empty stages get no width and
-// collapse to their own header.
-// NOTE: rem, so it follows the 18px root in index.css. w-80 is 20rem = 360px
-// there, the top of the 340-360px the owner asked for. Do not restate it in px:
-// the scale is already applied by the root font size.
-const COLUMN_WIDTH = "w-80";
+// Column width for a stage that has leads in it, while the board is a board.
+// Empty stages get no width and collapse to their own header, and stacked
+// nobody has a width at all.
+// NOTE: written out in full, variant included: Tailwind scans source text, so a
+// class built by interpolation is a class that never gets generated.
+// rem, so it follows the root font size in index.css. w-80 is 20rem.
+const COLUMN_WIDTH = "@lg/board:w-80";
 
-// The "no filter" chip value. Safe as a sentinel because a source id is always a
-// trimmed non-empty string, so it can never collide with a real one.
-const ALL_SOURCES = "";
+// Below this container width the board stops being a board (see BOARD_LAYOUT).
+// It is a CONTAINER query, not a viewport one: the sidebar collapses without the
+// viewport changing a pixel, so a viewport breakpoint would be wrong in one of
+// the two states. 32rem fits one full column plus a glimpse of the next; under
+// that you would see a single column at a time, which is everything the kanban
+// gave you, gone. So it becomes a vertical list grouped by stage instead.
+const BOARD_LAYOUT =
+  "flex flex-col gap-6 @lg/board:flex-row @lg/board:items-start @lg/board:gap-4 @lg/board:overflow-x-auto @lg/board:pb-2";
+
+// The "no filter" chip value. It has to be non-empty: ToggleGroup already uses
+// the empty string to mean "nothing selected", so an empty sentinel made the
+// All chip impossible to re-select, and the board filtered by a source that
+// does not exist. Checking it could not collide with a real source id was the
+// wrong check; what mattered was the component hosting it.
+const ALL_SOURCES = "__all__";
 
 interface LeadBoardProps {
   leads: Note[];
@@ -30,8 +43,12 @@ interface LeadBoardProps {
 
 // One card per lead. The board is for scanning, the dialog is for reading: at
 // rest a card shows only who the lead is, what is blocking it, where it came
-// from, which stage it sits in and when it arrived. Contact and free text live
-// in EditLeadDialog, one click away.
+// from and when it arrived. Contact and free text live in EditLeadDialog, one
+// click away. The stage is not on the card at all: the column already says it.
+//
+// The card owns the surface, the column does not. The other way around, two
+// leads in one column read as a single block, because the only thing drawing an
+// edge around a card was a border that is transparent in the healthy case.
 //
 // Two problems, two different signals, both readable without reading:
 //   no next step -> dashed amber edge + hollow circle. Nothing is scheduled.
@@ -39,13 +56,15 @@ interface LeadBoardProps {
 // Dashed/hollow vs solid/filled keeps them apart without relying on colour alone.
 function LeadCard({
   lead,
-  status,
+  nextStage,
   today,
   onUpdate,
   onRemove,
 }: {
   lead: Note;
-  status: string;
+  // The stage after this one, or undefined in the last one: a lead that closed
+  // has nowhere else to go, so it gets no button rather than a disabled one.
+  nextStage: LeadStage | undefined;
   today: string;
   onUpdate: LeadBoardProps["onUpdate"];
   onRemove: LeadBoardProps["onRemove"];
@@ -65,11 +84,13 @@ function LeadCard({
   return (
     <li
       className={cn(
-        "group/lead rounded-r-md border-l-2 py-1 pl-2.5",
+        "group/lead rounded-lg border-l-2 bg-card p-2.5 ring-1 ring-foreground/10",
         overdue
           ? "border-solid border-destructive"
           : nextStep
-            ? "border-transparent"
+            ? // Transparent, not absent: a 2px jump when a lead goes overdue
+              // would shift every card under it.
+              "border-transparent"
             : "border-dashed border-amber",
       )}
     >
@@ -114,20 +135,23 @@ function LeadCard({
       )}
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-        {/* Native select to move stage, same choice as the workout chart picker.
-            Keeps the board editable without a heavy per-row ToggleGroup. */}
-        <select
-          value={status}
-          onChange={(e) => onUpdate(lead.id, { status: e.target.value })}
-          aria-label={t("business.stageOf", { name: title })}
-          className="h-7 rounded-lg border border-input bg-transparent px-1.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-        >
-          {leadConfig.stages.map((s) => (
-            <option key={s.id} value={s.id}>
-              {stageLabel(s, t)}
-            </option>
-          ))}
-        </select>
+        {/* One tap forward instead of a stage picker. The board already groups
+            by stage, so a picker on the card spent the heaviest control on the
+            one thing the owner can already see. Moving backwards or skipping a
+            stage is rare and lives in EditLeadDialog.
+            Pill radius and xs height to sit level with the source badge. */}
+        {nextStage && (
+          <Button
+            variant="outline"
+            size="xs"
+            className="rounded-full"
+            onClick={() => onUpdate(lead.id, { status: nextStage.id })}
+            aria-label={t("business.leadMoveTo", { name: stageLabel(nextStage, t) })}
+          >
+            <ChevronRight />
+            {stageLabel(nextStage, t)}
+          </Button>
+        )}
         {source && (
           <Badge variant="outline" className="font-normal text-muted-foreground">
             {source}
@@ -187,10 +211,10 @@ export function LeadBoard({ leads, onUpdate, onRemove }: LeadBoardProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* No chip row when nothing carries a source: a lone "All" chip filters
-          nothing and still costs a row of vertical space. */}
-      {chips.length > 0 && (
+    <div className="@container/board flex flex-col gap-4">
+      {/* One source means one chip next to "All", a whole row that filters
+          nothing. The row only earns its vertical space with two or more. */}
+      {chips.length >= 2 && (
         <ToggleGroup
           value={[sourceFilter]}
           onValueChange={(v) => v.length > 0 && setSourceFilter(v[0] as string)}
@@ -223,32 +247,39 @@ export function LeadBoard({ leads, onUpdate, onRemove }: LeadBoardProps) {
         </ToggleGroup>
       )}
 
-      {/* The board scrolls sideways, the cards never compress. Every column is
-          shrink-0, so the row overflows instead of squeezing, and overflow-x-auto
-          puts the scrollbar on this container rather than on the page body.
-          Nothing here counts the stages: two of them or six lay out the same way. */}
-      <div className="flex items-start gap-4 overflow-x-auto pb-2">
-        {stages.map((stage) => {
+      {/* Wide: columns side by side, every one shrink-0 so the row overflows
+          instead of squeezing the cards, with the scrollbar on this container
+          rather than on the page body. Narrow: the same markup stacks into a
+          vertical list, each stage its own titled section.
+          Nothing here counts the stages: two of them or six lay out the same. */}
+      <div className={BOARD_LAYOUT}>
+        {stages.map((stage, i) => {
           const items = byStage[stage.id];
           return (
-            <Card
+            <section
               key={stage.id}
-              size="sm"
-              // NOTE: an empty stage gets no width, so it collapses to its header
-              // and stops spending board space on nothing.
-              className={cn("shrink-0 gap-3 px-4", items.length > 0 && COLUMN_WIDTH)}
+              // The column is a region with a title, not a surface: the cards
+              // are the surfaces, and a card inside a card muddies both.
+              // NOTE: an empty stage gets no width in board layout, so it
+              // collapses to its header and stops spending board space on
+              // nothing. Stacked it is a one-line header saying "0", which is
+              // worth keeping: it tells the owner the stage exists and is empty.
+              className={cn(
+                "flex flex-col gap-3 @lg/board:shrink-0",
+                items.length > 0 && COLUMN_WIDTH,
+              )}
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 border-b border-foreground/10 pb-1.5">
                 <h3 className="font-medium whitespace-nowrap">{stageLabel(stage, t)}</h3>
                 <Badge variant="outline">{items.length}</Badge>
               </div>
               {items.length > 0 && (
-                <ul className="flex flex-col gap-3">
+                <ul className="flex flex-col gap-2">
                   {items.map((lead) => (
                     <LeadCard
                       key={lead.id}
                       lead={lead}
-                      status={stage.id}
+                      nextStage={stages[i + 1]}
                       today={today}
                       onUpdate={onUpdate}
                       onRemove={onRemove}
@@ -256,7 +287,7 @@ export function LeadBoard({ leads, onUpdate, onRemove }: LeadBoardProps) {
                   ))}
                 </ul>
               )}
-            </Card>
+            </section>
           );
         })}
       </div>

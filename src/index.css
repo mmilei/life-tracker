@@ -117,13 +117,18 @@
   html {
     @apply font-sans;
     /*
-      NOTE: single scale knob for the whole app. Every size in the project is a
-      Tailwind rem utility, so raising the root from the 16px default lifts
-      type, padding, gaps and widths together. The app read as too small on the
-      owner's 1440p screen and worse on a 4K Mac.
-      Breakpoints are unaffected: rem inside a media query always resolves
-      against the initial 16px, not this override, so sm/md/lg stay put.
+      Back to the 16px default, on purpose.
+      This used to be 18px, a single knob that lifted type, padding, gaps and
+      widths together, because the app read as too small on a 1440p screen. The
+      knob was the wrong tool: the window is resized across a wide range, from
+      narrow (where it has to behave like mobile) to wide desktop, and one
+      constant cannot serve a range. It cost 12.5% of horizontal room exactly
+      where room was scarce, and it silently shifted every breakpoint, since rem
+      inside a media query always resolves against 16px while the content it
+      gates did not.
+      Anything that needs to be larger asks for it locally, where the tradeoff
+      is visible.
     */
-    font-size: 18px;
+    font-size: 16px;
   }
 }

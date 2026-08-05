@@ -21,7 +21,7 @@ export function WeekHistory({ weeks, currentWeekStart, getWeek, areas }: WeekHis
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="font-display text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+      <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
         {t("week.history")}
       </h2>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -32,7 +32,7 @@ export function WeekHistory({ weeks, currentWeekStart, getWeek, areas }: WeekHis
           <Card key={ws} size="sm" className="gap-2 px-4">
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium">{t("week.weekOf", { date: formatDayLong(ws) })}</span>
-              <Badge variant="secondary" className="font-display tabular-nums">
+              <Badge variant="secondary" className="tabular-nums">
                 {avg.toFixed(1)}
               </Badge>
             </div>

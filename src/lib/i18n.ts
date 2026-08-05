@@ -51,6 +51,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "nav.workout": "Entreno",
     "nav.business": "Negocio",
     "nav.language": "Idioma",
+    "nav.toggleSidebar": "Barra lateral",
     "nav.comingSoon": "Próximamente",
 
     // common — shared controls and copy
@@ -175,8 +176,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.title": "Negocio",
     "business.notes": "Notas",
     "business.leads": "Leads",
-    "business.notesCount": "{n} notas",
-    "business.leadsCount": "{n} leads",
+    "business.leadMoveTo": "Mover a {name}",
     "business.addNote": "Agregar nota",
     "business.addLead": "Agregar lead",
     "business.newTitle": "Nueva entrada",
@@ -201,7 +201,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.editLeadDescription": "Actualizá los datos y el próximo paso.",
     "business.editLeadAria": "Editar {name}",
     "business.stage": "Etapa",
-    "business.stageOf": "Etapa de {name}",
     "business.notesEmpty": "Todavía no hay notas. Agregá la primera para empezar a registrar tus ideas.",
     "business.leadsEmpty": "Todavía no hay leads. Agregá el primero para empezar a seguir tu pipeline.",
     "business.leadNew": "Nuevo",
@@ -240,6 +239,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "nav.workout": "Workout",
     "nav.business": "Business",
     "nav.language": "Language",
+    "nav.toggleSidebar": "Sidebar",
     "nav.comingSoon": "Coming soon",
 
     // common — shared controls and copy
@@ -363,8 +363,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.title": "Business",
     "business.notes": "Notes",
     "business.leads": "Leads",
-    "business.notesCount": "{n} notes",
-    "business.leadsCount": "{n} leads",
+    "business.leadMoveTo": "Move to {name}",
     "business.addNote": "Add note",
     "business.addLead": "Add lead",
     "business.newTitle": "New entry",
@@ -389,7 +388,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.editLeadDescription": "Update the details and the next step.",
     "business.editLeadAria": "Edit {name}",
     "business.stage": "Stage",
-    "business.stageOf": "Stage of {name}",
     "business.notesEmpty": "No notes yet. Add your first one to start capturing your ideas.",
     "business.leadsEmpty": "No leads yet. Add your first one to start tracking your pipeline.",
     "business.leadNew": "New",

@@ -105,7 +105,7 @@ export function KpiPinGrid() {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {t("home.indicators")}
         </h2>
         <Button variant="ghost" size="sm" onClick={() => setEditing((e) => !e)}>

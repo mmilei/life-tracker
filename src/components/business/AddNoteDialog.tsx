@@ -73,13 +73,17 @@ export function AddNoteDialog({ noteTypes, defaultTypeId, onAdd }: AddNoteDialog
         <Plus />
         {defaultTypeId === "lead" ? t("business.addLead") : t("business.addNote")}
       </DialogTrigger>
-      <DialogContent>
+      {/* Same shape as the edit dialog: capped height, header and footer fixed,
+          and the form is the only thing that scrolls. This is the longest form in
+          the app (type, stage and six lead fields), so on a short window the save
+          button was the first thing to fall off the bottom. */}
+      <DialogContent className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>{t("business.newTitle")}</DialogTitle>
           <DialogDescription>{t("business.newDescription")}</DialogDescription>
         </DialogHeader>
         <form
-          className="flex flex-col gap-4"
+          className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1"
           onSubmit={(e) => {
             e.preventDefault();
             submit();
