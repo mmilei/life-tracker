@@ -22,19 +22,27 @@ globalThis.localStorage = {
 globalThis.location = { reload: () => {} };
 
 const {
-  DEFAULT_PATH,
+  DEFAULT_FOLDER,
+  DOMAIN_FILES,
+  DOMAIN_FILE_NAMES,
+  LEGACY_FILE,
   clearConfig,
+  contentsUrl,
   decideSync,
   decodePayload,
+  domainOf,
   encodePayload,
   fromBase64,
   getLastSyncedAt,
   isRemoteNewer,
+  latestSyncedAt,
   loadConfig,
   mergeBackups,
   normalizeConfig,
+  normalizeFolder,
   saveConfig,
   setLastSyncedAt,
+  splitBackup,
   statusToCode,
   toBase64,
 } = await import("../src/lib/sync.ts");
@@ -252,6 +260,143 @@ check("mergeBackups does not reorder leadStages or leadSources: whole-file rule 
   assert.equal(merged["lt.leadStages"].at(-1).id, "Cerrado", "Cerrado is still last");
 });
 
+// ------------------------------------------------------- one file per domain
+// The remote state is five files instead of one, so two devices editing
+// different tabs never write the same file. These asserts are the guarantee
+// that splitting it up cannot lose a key on the way.
+check("every backup key belongs to exactly one domain file", () => {
+  const mapped = Object.values(DOMAIN_FILES).flat();
+  assert.equal(new Set(mapped).size, mapped.length, "a key is listed in two domain files");
+
+  for (const key of Object.values(STORAGE_KEYS)) {
+    if (!isBackupKey(key)) {
+      assert.equal(domainOf(key), null, `${key} does not travel, so it must have no domain`);
+      continue;
+    }
+    // Loud on purpose: a new backup key with no home here would silently stop
+    // syncing, which is the failure isBackupKey's prefix rule exists to avoid.
+    assert.ok(mapped.includes(key), `${key} is backed up but no domain file claims it`);
+  }
+  for (const key of mapped) {
+    assert.ok(isBackupKey(key), `${key} is in a domain file but isBackupKey says it stays home`);
+  }
+});
+
+check("splitBackup and its union are the identity, key for key", () => {
+  // One entry per domain, so nothing about this passes by having an empty side.
+  const backup = {
+    "lt.habits": [{ id: "h1", name: "Entrenar" }],
+    "lt.habitLogs": [{ habitId: "h1", date: "2026-08-05" }],
+    "lt.lifeAreas": [{ id: "a1", name: "Salud" }],
+    "lt.weeklyRatings": [{ weekStart: "2026-08-03", areaId: "a1", score: 8 }],
+    "lt.muscleGroups": [{ id: "m1", name: "Espalda" }],
+    "lt.workouts": [{ id: "w1", groupId: "m1" }],
+    "lt.noteTypes": [{ id: "lead", label: "Lead" }],
+    "lt.notes": [{ id: "n1", typeId: "lead", title: "maxi" }],
+    "lt.leadStages": [{ id: "Nuevo" }, { id: "Cerrado" }],
+    "lt.leadSources": [{ id: "s1", label: "Showroom" }],
+    "lt.lang": "es",
+    "lt.homePins": ["habit-streak"],
+  };
+  const split = splitBackup(backup);
+  assert.deepEqual(Object.keys(split).sort(), [...DOMAIN_FILE_NAMES].sort(), "every file is written");
+  assert.deepEqual(Object.assign({}, ...Object.values(split)), backup, "the union of the five files is the old one");
+  assert.deepEqual(
+    Object.keys(split["business.json"]).sort(),
+    ["lt.leadSources", "lt.leadStages", "lt.noteTypes", "lt.notes"],
+    "the leads tab travels as one file, so stages and the notes that reference them cannot desync",
+  );
+
+  // The migration path: an old single file read once, split, and re-merged.
+  assert.deepEqual(Object.assign({}, ...Object.values(splitBackup(Object.assign({}, ...Object.values(split))))), backup);
+  assert.deepEqual(splitBackup({}), Object.fromEntries(DOMAIN_FILE_NAMES.map((f) => [f, {}])), "an empty backup still writes every file");
+});
+
+check("a write dirties one domain file and no other", () => {
+  // What sync-engine's onLocalChange does with the key storage.ts hands it. If
+  // this mapped a key to more than one file, one tick of a habit would commit
+  // the leads file too.
+  for (const [file, keys] of Object.entries(DOMAIN_FILES)) {
+    for (const key of keys) {
+      const dirtied = DOMAIN_FILE_NAMES.filter((f) => domainOf(key) === f);
+      assert.deepEqual(dirtied, [file], `writing ${key} must dirty ${file} and nothing else`);
+    }
+  }
+  assert.equal(domainOf(STORAGE_KEYS.sidebarCollapsed), null, "a device preference dirties nothing");
+  assert.equal(domainOf("lt.sync.config"), null, "the token dirties nothing");
+  assert.equal(domainOf("lt.futureFeature"), null, "an unmapped key dirties nothing, and check-sync above fails loudly for it");
+
+  // NOTE: asserted against the source text, because sync-engine.ts imports the
+  // `@/` alias and Node has no resolver for it here (same limitation as the
+  // seed.ts assert below). Upgrade path is identical: an import map.
+  const engine = readFileSync(new URL("../src/lib/sync-engine.ts", import.meta.url), "utf8");
+  assert.match(engine, /const dirty = new Set<string>\(\)/, "dirty must be per file, not a single flag");
+  assert.match(engine, /function onLocalChange\(key: string\)[\s\S]*?domainOf\(key\)[\s\S]*?dirty\.add\(file\)/, "a write must dirty only the file that owns the key");
+  assert.ok(!/\bdirty = (true|false)\b/.test(engine), "a global dirty flag came back");
+});
+
+check("each domain file keeps its own last-synced marker", () => {
+  store.clear();
+  assert.equal(latestSyncedAt(), null, "nothing synced yet");
+  setLastSyncedAt("habits.json", "2026-08-05T10:00:00.000Z");
+  setLastSyncedAt("business.json", "2026-08-05T12:00:00.000Z");
+  assert.equal(getLastSyncedAt("habits.json"), "2026-08-05T10:00:00.000Z");
+  assert.equal(getLastSyncedAt("business.json"), "2026-08-05T12:00:00.000Z", "the second write must not overwrite the first");
+  assert.equal(getLastSyncedAt("week.json"), null, "a file nobody synced has no marker");
+  assert.equal(latestSyncedAt(), "2026-08-05T12:00:00.000Z", "the UI shows the newest of them");
+
+  // Same remote timestamp, different local markers: the decision has to differ
+  // per file, which is the whole point of keeping them apart.
+  const remote = "2026-08-05T11:00:00.000Z";
+  const decide = (file, dirty) =>
+    decideSync({ remoteUpdatedAt: remote, lastSyncedAt: getLastSyncedAt(file), dirty });
+  assert.equal(decide("habits.json", false), "adopt", "behind on habits: take the remote");
+  assert.equal(decide("business.json", false), "noop", "up to date on business: leave it alone");
+  assert.equal(decide("week.json", false), "adopt", "never synced: take what's up there");
+  assert.equal(decide("habits.json", true), "push", "unpushed local edits still win their own file");
+
+  store.set("lt.sync.lastSyncedAt", "2026-08-04T10:00:00.000Z"); // the pre-split scalar
+  assert.equal(getLastSyncedAt("habits.json"), null, "an old scalar marker reads as never synced, and adopting merges");
+  store.clear();
+});
+
+check("the Contents API path is the folder plus the file name", () => {
+  const cfg = (path) => ({ token: "t", repo: "me/tracker", path });
+  assert.equal(
+    contentsUrl(cfg(""), "habits.json"),
+    "https://api.github.com/repos/me/tracker/contents/habits.json",
+    "an empty folder is the repo root, with no double slash",
+  );
+  assert.equal(
+    contentsUrl(cfg("data/life"), "business.json"),
+    "https://api.github.com/repos/me/tracker/contents/data/life/business.json",
+    "nested folders keep their separators unescaped",
+  );
+  assert.equal(
+    contentsUrl(cfg("mis datos"), "week.json"),
+    "https://api.github.com/repos/me/tracker/contents/mis%20datos/week.json",
+    "each segment is escaped on its own",
+  );
+  assert.equal(contentsUrl(cfg(""), LEGACY_FILE), "https://api.github.com/repos/me/tracker/contents/life-tracker-state.json");
+  for (const file of DOMAIN_FILE_NAMES) {
+    assert.match(contentsUrl(cfg("x"), file), new RegExp(`/contents/x/${file}$`), `${file} lands next to its siblings`);
+  }
+});
+
+check("a saved file path is read as the folder that file was in", () => {
+  // Devices configured before the split have the single file's path stored.
+  assert.equal(normalizeFolder("life-tracker-state.json"), "", "a root-level file means the root");
+  assert.equal(normalizeFolder("data/life-tracker-state.json"), "data");
+  assert.equal(normalizeFolder("/data/nested/state.JSON"), "data/nested", "case and leading slash included");
+  assert.equal(normalizeFolder("data/"), "data", "a folder is left alone, minus the trailing slash");
+  assert.equal(normalizeFolder("  "), DEFAULT_FOLDER);
+  assert.equal(
+    normalizeConfig({ token: "t", repo: "me/tracker", path: "backups/life-tracker-state.json" }).path,
+    "backups",
+    "the five files land in the folder the old file lived in",
+  );
+});
+
 // ------------------------------------------------------------------ HTTP codes
 check("statusToCode maps the statuses the UI has copy for", () => {
   assert.equal(statusToCode(401), "auth");
@@ -267,28 +412,28 @@ check("normalizeConfig cleans what a human pastes", () => {
   assert.deepEqual(normalizeConfig({ token: " t ", repo: " me/tracker ", path: "" }), {
     token: "t",
     repo: "me/tracker",
-    path: DEFAULT_PATH,
+    path: DEFAULT_FOLDER,
   });
   assert.deepEqual(normalizeConfig({ token: "t", repo: "https://github.com/me/tracker.git" }), {
     token: "t",
     repo: "me/tracker",
-    path: DEFAULT_PATH,
+    path: DEFAULT_FOLDER,
   });
   assert.equal(normalizeConfig({ token: "t", repo: "me" }), null, "repo needs owner/name");
   assert.equal(normalizeConfig({ token: "", repo: "me/tracker" }), null, "token required");
   assert.equal(normalizeConfig(null), null);
 });
 
-check("config and last-sync marker round trip through storage", () => {
+check("config and last-sync markers round trip through storage", () => {
   store.clear();
   assert.equal(loadConfig(), null, "nothing configured → null, never a throw");
-  saveConfig(normalizeConfig({ token: "tok", repo: "me/tracker", path: "state.json" }));
-  assert.deepEqual(loadConfig(), { token: "tok", repo: "me/tracker", path: "state.json" });
-  setLastSyncedAt("2026-08-04T10:00:00.000Z");
-  assert.equal(getLastSyncedAt(), "2026-08-04T10:00:00.000Z");
+  saveConfig(normalizeConfig({ token: "tok", repo: "me/tracker", path: "data/" }));
+  assert.deepEqual(loadConfig(), { token: "tok", repo: "me/tracker", path: "data" });
+  setLastSyncedAt("habits.json", "2026-08-04T10:00:00.000Z");
+  assert.equal(getLastSyncedAt("habits.json"), "2026-08-04T10:00:00.000Z");
   clearConfig();
   assert.equal(loadConfig(), null);
-  assert.equal(getLastSyncedAt(), null, "disconnect must forget the marker too");
+  assert.equal(getLastSyncedAt("habits.json"), null, "disconnect must forget the markers too");
 });
 
 check("a corrupt config entry reads as 'not configured'", () => {

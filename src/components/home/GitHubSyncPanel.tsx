@@ -14,7 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { getLocale } from "@/lib/dates";
-import { DEFAULT_PATH, loadConfig, normalizeConfig, type SyncErrorCode } from "@/lib/sync";
+import { DEFAULT_FOLDER, loadConfig, normalizeConfig, type SyncErrorCode } from "@/lib/sync";
 import { applySyncConfig, getSyncStatus, subscribeSyncStatus, syncNow } from "@/lib/sync-engine";
 import { useT } from "@/store/AppStore";
 
@@ -59,7 +59,7 @@ function SettingsDialog() {
   const saved = loadConfig();
   const [token, setToken] = useState(saved?.token ?? "");
   const [repo, setRepo] = useState(saved?.repo ?? "");
-  const [path, setPath] = useState(saved?.path ?? DEFAULT_PATH);
+  const [path, setPath] = useState(saved?.path ?? DEFAULT_FOLDER);
 
   const cfg = normalizeConfig({ token, repo, path });
 
@@ -100,7 +100,7 @@ function SettingsDialog() {
             label={t("sync.path")}
             value={path}
             onChange={setPath}
-            placeholder={DEFAULT_PATH}
+            placeholder={t("sync.pathPlaceholder")}
           />
           {!cfg && (token || repo) && (
             <p className="text-xs text-destructive">{t("sync.invalidConfig")}</p>
@@ -115,7 +115,7 @@ function SettingsDialog() {
                 applySyncConfig(null);
                 setToken("");
                 setRepo("");
-                setPath(DEFAULT_PATH);
+                setPath(DEFAULT_FOLDER);
                 setOpen(false);
               }}
             >

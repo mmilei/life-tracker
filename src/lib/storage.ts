@@ -24,10 +24,11 @@ type SetValue<T> = (value: T | ((prev: T) => T)) => void;
 
 // One listener, because there is exactly one sync engine (src/lib/sync-engine.ts).
 // Every domain hook writes through useLocalStorage, so this is the single place
-// that knows "something changed" without every hook opting in.
-let writeListener: (() => void) | null = null;
+// that knows "something changed" without every hook opting in. It gets the key
+// that changed: the engine maps it to one domain file and pushes only that one.
+let writeListener: ((key: string) => void) | null = null;
 
-export function onLocalWrite(fn: () => void): void {
+export function onLocalWrite(fn: (key: string) => void): void {
   writeListener = fn;
 }
 
@@ -48,7 +49,7 @@ export function useLocalStorage<T>(key: string, initial: T): [T, SetValue<T>] {
       // Only a key that travels is worth waking the sync engine for. Without
       // this test, collapsing the sidebar scheduled a push and committed to the
       // user's repo, and the file it pushed was byte for byte the previous one.
-      if (isBackupKey(key)) writeListener?.();
+      if (isBackupKey(key)) writeListener?.(key);
     } catch {
       // TRADEOFF: swallow quota/serialization errors — single-user local app, no recovery path worth writing
     }
