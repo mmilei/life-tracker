@@ -73,7 +73,7 @@ const CATALOG: Kpi[] = [
   },
 ];
 
-// Default board: one KPI per domain tab, so Home resume las 4 tabs de un vistazo.
+// Default board: one KPI per domain tab, so Home summarizes the other 4 tabs at a glance.
 const DEFAULT_IDS = ["highest-streak", "week-avg", "workouts-week", "active-leads"];
 const kpiById = (id: string) => CATALOG.find((k) => k.id === id);
 
