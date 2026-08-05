@@ -1,5 +1,6 @@
 import { formatDayLong, todayISO } from "@/lib/dates";
-import { useT } from "@/store/AppStore";
+import { useAppStore } from "@/store/AppStore";
+import { HabitHeatmap } from "@/components/habits/HabitHeatmap";
 import { StreakHero } from "./StreakHero";
 import { KpiPinGrid } from "./KpiPinGrid";
 import { WeeklySummaryCard } from "./WeeklySummaryCard";
@@ -11,7 +12,7 @@ import { GitHubSyncPanel } from "./GitHubSyncPanel";
 // Home dashboard: summary of the other 4 tabs. Today's streak, pinned
 // indicators (up to 4), week snapshot, and today's habit checklist.
 export function HomeTab() {
-  const t = useT();
+  const { habits, t } = useAppStore();
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,6 +37,15 @@ export function HomeTab() {
         <TodayChecklist />
         <LeadSourcesCard />
       </div>
+
+      {/* Last ~14 weeks, no picker: a glance at total daily completion, not
+          the full-year per-habit breakdown that lives on the Habits tab. */}
+      <HabitHeatmap
+        habits={habits.habits}
+        isDone={habits.isDone}
+        weeksToShow={14}
+        title={t("home.heatmapTitle")}
+      />
 
       <BackupControls />
       <GitHubSyncPanel />

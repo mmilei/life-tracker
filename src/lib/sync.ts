@@ -138,6 +138,114 @@ export function isRemoteNewer(remoteUpdatedAt: string, localLastSyncedAt: string
   return Number.isNaN(local) || remote > local;
 }
 
+export type SyncDecision = "adopt" | "push" | "noop";
+
+export interface SyncDecisionInput {
+  remoteUpdatedAt: string | null; // null = the remote file doesn't exist yet
+  lastSyncedAt: string | null;
+  dirty: boolean; // this device has local writes that never reached the remote
+}
+
+// The whole point of this function is the `dirty` row. A newer remote used to be
+// adopted unconditionally, which meant a device that had just been edited threw
+// those edits away the moment another device pushed. Local edits win the file:
+// what the remote had that we don't is recovered by mergeBackups() on the next
+// adopt, in whichever direction it happens.
+export function decideSync({
+  remoteUpdatedAt,
+  lastSyncedAt,
+  dirty,
+}: SyncDecisionInput): SyncDecision {
+  if (remoteUpdatedAt === null) return "push"; // nothing up there: this device creates the file
+  if (isRemoteNewer(remoteUpdatedAt, lastSyncedAt)) return dirty ? "push" : "adopt";
+  return dirty ? "push" : "noop";
+}
+
+// Identity of an entry inside an array-valued backup key. Almost everything has
+// an `id`; habit logs and weekly ratings never did, their identity is composite.
+const ENTITY_IDENTITY: Record<string, string[]> = {
+  "lt.habitLogs": ["habitId", "date"],
+  "lt.weeklyRatings": ["weekStart", "areaId"],
+};
+
+const SEP = "\u0000"; // no id or date can smuggle a NUL in, so composite keys can't collide
+
+function identity(storageKey: string, entry: unknown): string {
+  const fields = ENTITY_IDENTITY[storageKey] ?? ["id"];
+  if (typeof entry === "object" && entry !== null) {
+    const parts = fields.map((f) => (entry as Record<string, unknown>)[f]);
+    if (parts.every((p) => typeof p === "string" || typeof p === "number")) {
+      return `k:${parts.join(SEP)}`;
+    }
+  }
+  // A primitive, or an entity shape this build doesn't know: fall back to the
+  // whole value, so it gets deduped but is never dropped.
+  return `v:${JSON.stringify(entry)}`;
+}
+
+// Same rule as isRemoteNewer, per entity instead of per file. An entity with no
+// (or an unparsable) updatedAt counts as maximally old, so it never wins a
+// conflict it shouldn't: ties go to local, see mergeEntities.
+function entityUpdatedAt(entry: unknown): number {
+  const raw =
+    typeof entry === "object" && entry !== null
+      ? (entry as { updatedAt?: unknown }).updatedAt
+      : undefined;
+  const t = typeof raw === "string" ? Date.parse(raw) : Number.NaN;
+  return Number.isNaN(t) ? -Infinity : t;
+}
+
+function mergeEntities(storageKey: string, local: unknown[], remote: unknown[]): unknown[] {
+  const out = new Map<string, unknown>();
+  for (const entry of remote) out.set(identity(storageKey, entry), entry);
+  for (const entry of local) {
+    const key = identity(storageKey, entry);
+    const rival = out.get(key);
+    // >= : on a tie (and today every tie is -Infinity vs -Infinity, since no
+    // entity carries updatedAt yet) local wins, because local is the copy the
+    // adopting device is about to overwrite.
+    if (rival === undefined || entityUpdatedAt(entry) >= entityUpdatedAt(rival)) {
+      out.set(key, entry); // Map.set keeps the original position, so remote order holds
+    }
+  }
+  return [...out.values()];
+}
+
+// leadStages and leadSources are excluded from the entity merge below on
+// purpose. They are the one array in this app where POSITION is meaning, not
+// just membership: Nuevo/Cerrado must stay first/last (src/lib/leads.ts).
+// Entity-by-entity union has no notion of that, and a stage that exists only
+// on the merging device lands at the end, past Cerrado. Seen live 2026-08-05.
+// Plain replace is safe here specifically because `dirty` (sync-engine.ts)
+// gates every adopt: this only runs when the device has no unpushed writes,
+// so there is nothing local-only to lose by taking the remote array whole,
+// same as any non-array value.
+const NO_ENTITY_MERGE = new Set(["lt.leadStages", "lt.leadSources"]);
+
+// Union of two backups, entity by entity, used when adopting a remote file.
+// Replacing the whole file used to delete anything this device had and the
+// remote didn't: a habit created offline, a log ticked on the phone.
+//
+// NOTE: union with a per-entity updatedAt tiebreak, no tombstones. A delete on
+// device A comes back the first time it merges with a device B that still has
+// the entity. Upgrade path when that bites: a deletedAt marker per entity plus a
+// sweep, which is also what would make a real last-writer-wins possible. No
+// domain hook stamps updatedAt on write yet (see entityUpdatedAt), so today's
+// conflicts resolve as local-wins in practice; the moment a caller starts
+// setting it, the newer side starts winning without any change here.
+export function mergeBackups(
+  local: Record<string, unknown>,
+  remote: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...local, ...remote }; // non-arrays: remote wins
+  for (const key of Object.keys(merged)) {
+    const l = local[key];
+    const r = remote[key];
+    if (Array.isArray(l) && Array.isArray(r) && !NO_ENTITY_MERGE.has(key)) merged[key] = mergeEntities(key, l, r);
+  }
+  return merged;
+}
+
 function contentsUrl(cfg: SyncConfig): string {
   const path = cfg.path.split("/").map(encodeURIComponent).join("/");
   return `https://api.github.com/repos/${cfg.repo}/contents/${path}`;

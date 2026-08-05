@@ -11,10 +11,10 @@ export function useHabits(lang: Lang) {
   const [logs, setLogs] = useLocalStorage<HabitLog[]>(STORAGE_KEYS.habitLogs, []);
 
   const addHabit = useCallback(
-    (name: string, color: string) =>
+    (name: string, color: string, emoji?: string) =>
       setHabits((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), name, color, createdAt: todayISO() },
+        { id: crypto.randomUUID(), name, color, emoji: emoji || undefined, createdAt: todayISO() },
       ]),
     [setHabits],
   );

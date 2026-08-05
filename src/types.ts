@@ -5,6 +5,7 @@ export interface Habit {
   id: string;
   name: string;
   color: string; // hex, chosen from ColorPicker
+  emoji?: string; // single grapheme from the system emoji keyboard; falls back to the color dot when absent
   createdAt: string; // ISO day
 }
 

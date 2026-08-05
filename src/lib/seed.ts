@@ -51,6 +51,15 @@ const AREAS: Record<Lang, string[]> = {
   en: ["Business", "Personal brand", "Gym", "Looks", "Relationship", "Mindset", "Results"],
 };
 
+// Ids are fixed slugs, labels are per language, same shape as the lead stages
+// below. They used to be crypto.randomUUID(), which is a bug the moment two
+// devices seed before ever syncing: each mints its own ids, and when one adopts
+// the other's backup its notes point at type ids that no longer exist, so the
+// badge falls back to a dash. Fixed ids make the two seeds identical.
+// Devices that already seeded keep their stored uuids (seeding only runs when
+// lt.noteTypes is absent), so their existing notes still resolve.
+const NOTE_TYPE_IDS = ["improve", "achieved", "reflection", "other"];
+
 const NOTE_TYPES: Record<Lang, string[]> = {
   es: ["Quiero mejorar", "Logré", "Reflexión", "Otro"],
   en: ["Want to improve", "Achieved", "Reflection", "Other"],
@@ -66,9 +75,10 @@ export const seedHabits = (lang: Lang = DEFAULT_LANG): Habit[] => HABITS[lang].m
 export const seedLifeAreas = (lang: Lang = DEFAULT_LANG): LifeArea[] =>
   AREAS[lang].map((name) => ({ id: crypto.randomUUID(), name }));
 
-// 'lead' id is fixed — the Business tab filters Leads on typeId === 'lead'.
+// 'lead' id is fixed for a second reason on top of the one above: the Business
+// tab filters Leads on typeId === 'lead'.
 export const seedNoteTypes = (lang: Lang = DEFAULT_LANG): NoteType[] => [
-  ...NOTE_TYPES[lang].map((label) => ({ id: crypto.randomUUID(), label })),
+  ...NOTE_TYPE_IDS.map((id, i) => ({ id, label: NOTE_TYPES[lang][i] })),
   { id: "lead", label: "Lead" },
 ];
 

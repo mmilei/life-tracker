@@ -26,8 +26,9 @@ dist-ssr
 # Local reference material, not part of the project
 .reference-frames/
 
-# Loop state file: internal, never published
+# Loop state and cost-tracking files: internal, never published
 LOOP-STATE.md
+LOOP-USAGE.md
 
 # Cygwin/Git Bash crash dumps
 *.stackdump

@@ -101,6 +101,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.backupExported": "Backup exportado.",
     "home.importError": "Archivo inválido. No se pudo importar.",
     "home.importWarning": "Importar reemplaza todos los datos actuales con los del archivo.",
+    "home.heatmapTitle": "Últimas semanas",
 
     // sync — respaldo automático en GitHub (home/GitHubSyncPanel.tsx)
     "sync.title": "Sync con GitHub",
@@ -149,7 +150,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "habits.newTitle": "Nuevo hábito",
     "habits.newDescription": "Algo que querés sostener todos los días.",
     "habits.namePlaceholder": "Ej: Entrenar, Leer, Meditar…",
+    "habits.emojiLabel": "Emoji (opcional)",
     "habits.dayAria": "{name} — {date}",
+    "habits.prevMonth": "Mes anterior",
+    "habits.nextMonth": "Mes siguiente",
+    "habits.heatmapTitle": "Historial anual",
+    "habits.heatmapTotal": "Total",
+    "habits.heatmapFilterAria": "Filtrar por hábito",
 
     // workout
     "workout.title": "Entreno",
@@ -289,6 +296,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.backupExported": "Backup exported.",
     "home.importError": "Invalid file. Nothing was imported.",
     "home.importWarning": "Importing replaces all of your current data with the file's.",
+    "home.heatmapTitle": "Recent weeks",
 
     // sync — automatic GitHub backup (home/GitHubSyncPanel.tsx)
     "sync.title": "GitHub sync",
@@ -337,7 +345,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "habits.newTitle": "New habit",
     "habits.newDescription": "Something you want to keep up every day.",
     "habits.namePlaceholder": "e.g. Workout, Read, Meditate…",
+    "habits.emojiLabel": "Emoji (optional)",
     "habits.dayAria": "{name} — {date}",
+    "habits.prevMonth": "Previous month",
+    "habits.nextMonth": "Next month",
+    "habits.heatmapTitle": "Yearly history",
+    "habits.heatmapTotal": "Total",
+    "habits.heatmapFilterAria": "Filter by habit",
 
     // workout
     "workout.title": "Workout",

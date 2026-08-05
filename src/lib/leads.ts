@@ -136,6 +136,26 @@ export function stageLabel(stage: LeadStage, t: (key: string) => string): string
   return key ? t(key) : (stage.label ?? stage.id);
 }
 
+// Repairs Nuevo/Cerrado back to first/last without touching the order of
+// anything else. Idempotent: an already-correct array comes back as the exact
+// same reference, so a caller can skip a write when nothing changed.
+//
+// Why this exists: mergeBackups (src/lib/sync.ts) merges every array-valued
+// backup key entity by entity, and has no notion that this one list has fixed
+// endpoints. A stage that exists only on the device doing the merge is not in
+// `out` yet, so it lands at the END of the merged array, after Cerrado. Seen
+// live 2026-08-05: a stage added locally, synced, and Cerrado stopped being
+// last. There is no reorder UI, so a corrupted board could not fix itself
+// without this.
+export function normalizeStages(stages: LeadStage[]): LeadStage[] {
+  const first = stages.find((s) => s.id === FIXED_FIRST_STAGE);
+  const last = stages.find((s) => s.id === FIXED_LAST_STAGE);
+  if (!first || !last) return stages; // migration hasn't run yet: nothing safe to reorder
+  const rest = stages.filter((s) => s.id !== FIXED_FIRST_STAGE && s.id !== FIXED_LAST_STAGE);
+  const fixed = [first, ...rest, last];
+  return fixed.length === stages.length && fixed.every((s, i) => s === stages[i]) ? stages : fixed;
+}
+
 // --------------------------------------------------------------------- sources
 //
 // Same shape, one less rule: no fixed entries and no cap. The seeded six are
