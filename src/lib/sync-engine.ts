@@ -131,6 +131,12 @@ async function pull(cfg: SyncConfig): Promise<string[] | null> {
 
 // Sequential on purpose: each PUT is a commit on the same branch, and parallel
 // writes would race for the branch head and 409 against each other.
+//
+// TRADEOFF: a persistently failing file throws out of this loop and blocks
+// every file after it in DOMAIN_FILE_NAMES order for this pass — not data
+// loss (dirty is re-armed, the next syncNow retries from a fresh toPush), just
+// a delay for whatever sits behind a stuck domain. Upgrade path if that ever
+// bites: catch per file, accumulate errors, throw an aggregate at the end.
 async function push(cfg: SyncConfig, files: string[]): Promise<void> {
   const split = splitBackup(JSON.parse(exportBackup()) as Record<string, unknown>);
   for (const file of files) {
