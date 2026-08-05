@@ -26,11 +26,13 @@
 // No plurals, no formatting, no nesting. If a string needs more than that, split it.
 //
 // NOT IN HERE (on purpose):
-//   - Seed data (habit/area/note-type/muscle-group names) lives in src/lib/seed.ts,
-//     per language. It's user data after the first run, not UI copy.
-//   - Lead pipeline stages are STORED verbatim in Note.status, so LEAD_STATUSES keeps
-//     its Spanish values as stable ids; only the label is translated
-//     (`business.leadNew` … `business.leadClosed`).
+//   - Seed data (habit/area/note-type/muscle-group names, and the seeded lead
+//     stages and sources) lives in src/lib/seed.ts, per language. It's user data
+//     after the first run, not UI copy.
+//   - Lead stages: the two fixed ones ARE translated (`business.leadNew` and
+//     `business.leadClosed`), because the app owns them. The stages in between
+//     belong to the user and carry their own label, so they never are. Their ids
+//     stay Spanish in every language: Note.status stores them verbatim.
 //   - Date formatting: src/lib/dates.ts holds the active locale (`setDateLocale`,
 //     `getLocale`), set by AppStore. Use `getLocale()` for ad-hoc toLocaleDateString.
 
@@ -49,6 +51,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "nav.workout": "Entreno",
     "nav.business": "Negocio",
     "nav.language": "Idioma",
+    "nav.toggleSidebar": "Barra lateral",
     "nav.comingSoon": "Próximamente",
 
     // common — shared controls and copy
@@ -89,6 +92,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.unitToday": "hoy",
     "home.unitHabits": "hábitos",
     "home.notRated": "Todavía no puntuaste esta semana. Andá a Semana para empezar.",
+    "home.leadSources": "De dónde vienen",
+    "home.leadSourcesEmpty": "Todavía ningún lead tiene origen cargado.",
+    "home.leadSourcesCount": "{n} de {total} leads",
     "home.backup": "Respaldo",
     "home.exportBackup": "Exportar backup",
     "home.importBackup": "Importar backup",
@@ -170,8 +176,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.title": "Negocio",
     "business.notes": "Notas",
     "business.leads": "Leads",
-    "business.notesCount": "{n} notas",
-    "business.leadsCount": "{n} leads",
+    "business.leadMoveTo": "Mover a {name}",
     "business.addNote": "Agregar nota",
     "business.addLead": "Agregar lead",
     "business.newTitle": "Nueva entrada",
@@ -184,13 +189,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.leadContact": "Contacto",
     "business.leadContactPlaceholder": "Teléfono, mail o WhatsApp",
     "business.leadSource": "Origen",
-    "business.leadSourcePlaceholder": "¿De dónde salió?",
-    "business.sourceReferral": "Referido",
-    "business.sourceShowroom": "Showroom",
-    "business.sourceInstagram": "Instagram",
-    "business.sourceWeb": "Web",
-    "business.sourceArchitect": "Arquitecto o estudio",
-    "business.sourceSite": "Obra en curso",
+    "business.leadSourceNone": "Sin origen",
     "business.leadNextStep": "Próximo paso",
     "business.leadNextStepPlaceholder": "¿Qué falta para que avance?",
     "business.leadNextStepDate": "Fecha del próximo paso",
@@ -202,14 +201,32 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.editLeadDescription": "Actualizá los datos y el próximo paso.",
     "business.editLeadAria": "Editar {name}",
     "business.stage": "Etapa",
-    "business.stageOf": "Etapa de {name}",
     "business.notesEmpty": "Todavía no hay notas. Agregá la primera para empezar a registrar tus ideas.",
     "business.leadsEmpty": "Todavía no hay leads. Agregá el primero para empezar a seguir tu pipeline.",
-    "business.stageEmpty": "Sin leads en esta etapa.",
     "business.leadNew": "Nuevo",
-    "business.leadContacted": "Contactado",
-    "business.leadNegotiating": "Negociando",
     "business.leadClosed": "Cerrado",
+
+    // business: etapas y orígenes configurables
+    "business.stages": "Etapas",
+    "business.stagesTitle": "Etapas del pipeline",
+    "business.stagesDescription":
+      "“{first}” y “{last}” son fijas. Las del medio las armás vos, y podés renombrarlas o borrarlas cuando quieras.",
+    "business.stageAdd": "Agregar etapa",
+    "business.stagePlaceholder": "Ej: Presupuestado, Muestras enviadas…",
+    "business.stageFixed": "Etapa fija",
+    "business.stageLimit": "Llegaste al máximo de {n} etapas. Borrá una para agregar otra.",
+    "business.stageDeleteConfirm":
+      "Se eliminará la etapa “{name}”. Sus leads pasan a “{first}”. Esta acción no se puede deshacer.",
+    "business.sources": "Orígenes",
+    "business.sourcesTitle": "Orígenes de leads",
+    "business.sourcesDescription": "De dónde salen tus leads. Renombrar uno actualiza todos los que lo usan.",
+    "business.sourceAdd": "Agregar origen",
+    "business.sourcePlaceholder": "Ej: Feria, Recomendación de proveedor…",
+    "business.sourceDeleteConfirm":
+      "Se eliminará el origen “{name}”. Los leads que lo tenían quedan sin origen. Esta acción no se puede deshacer.",
+    "business.sourceFilterAll": "Todos",
+    "business.sourceFilterAria": "Filtrar por origen: {name}",
+    "business.rename": "Renombrar {name}",
   },
 
   en: {
@@ -222,6 +239,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "nav.workout": "Workout",
     "nav.business": "Business",
     "nav.language": "Language",
+    "nav.toggleSidebar": "Sidebar",
     "nav.comingSoon": "Coming soon",
 
     // common — shared controls and copy
@@ -262,6 +280,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.unitToday": "today",
     "home.unitHabits": "habits",
     "home.notRated": "You haven't rated this week yet. Head to Week to start.",
+    "home.leadSources": "Where they come from",
+    "home.leadSourcesEmpty": "No lead has a source yet.",
+    "home.leadSourcesCount": "{n} of {total} leads",
     "home.backup": "Backup",
     "home.exportBackup": "Export backup",
     "home.importBackup": "Import backup",
@@ -342,8 +363,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.title": "Business",
     "business.notes": "Notes",
     "business.leads": "Leads",
-    "business.notesCount": "{n} notes",
-    "business.leadsCount": "{n} leads",
+    "business.leadMoveTo": "Move to {name}",
     "business.addNote": "Add note",
     "business.addLead": "Add lead",
     "business.newTitle": "New entry",
@@ -356,13 +376,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.leadContact": "Contact",
     "business.leadContactPlaceholder": "Phone, email or WhatsApp",
     "business.leadSource": "Source",
-    "business.leadSourcePlaceholder": "Where did it come from?",
-    "business.sourceReferral": "Referral",
-    "business.sourceShowroom": "Showroom",
-    "business.sourceInstagram": "Instagram",
-    "business.sourceWeb": "Website",
-    "business.sourceArchitect": "Architect or studio",
-    "business.sourceSite": "Job site",
+    "business.leadSourceNone": "No source",
     "business.leadNextStep": "Next step",
     "business.leadNextStepPlaceholder": "What has to happen for this to move?",
     "business.leadNextStepDate": "Next step date",
@@ -374,14 +388,32 @@ const dict: Record<Lang, Record<string, string>> = {
     "business.editLeadDescription": "Update the details and the next step.",
     "business.editLeadAria": "Edit {name}",
     "business.stage": "Stage",
-    "business.stageOf": "Stage of {name}",
     "business.notesEmpty": "No notes yet. Add your first one to start capturing your ideas.",
     "business.leadsEmpty": "No leads yet. Add your first one to start tracking your pipeline.",
-    "business.stageEmpty": "No leads at this stage.",
     "business.leadNew": "New",
-    "business.leadContacted": "Contacted",
-    "business.leadNegotiating": "Negotiating",
     "business.leadClosed": "Closed",
+
+    // business: configurable stages and sources
+    "business.stages": "Stages",
+    "business.stagesTitle": "Pipeline stages",
+    "business.stagesDescription":
+      "“{first}” and “{last}” are fixed. The ones in between are yours to name, rename or delete.",
+    "business.stageAdd": "Add stage",
+    "business.stagePlaceholder": "e.g. Quoted, Samples sent…",
+    "business.stageFixed": "Fixed stage",
+    "business.stageLimit": "You've reached the limit of {n} stages. Delete one to add another.",
+    "business.stageDeleteConfirm":
+      "This will delete the “{name}” stage. Its leads move to “{first}”. This can't be undone.",
+    "business.sources": "Sources",
+    "business.sourcesTitle": "Lead sources",
+    "business.sourcesDescription": "Where your leads come from. Renaming one updates every lead using it.",
+    "business.sourceAdd": "Add source",
+    "business.sourcePlaceholder": "e.g. Trade show, Supplier referral…",
+    "business.sourceDeleteConfirm":
+      "This will delete the “{name}” source. Leads using it are left with no source. This can't be undone.",
+    "business.sourceFilterAll": "All",
+    "business.sourceFilterAria": "Filter by source: {name}",
+    "business.rename": "Rename {name}",
   },
 };
 

@@ -45,13 +45,29 @@ export interface NoteType {
   label: string;
 }
 
+// A column of the lead board. The two fixed stages (first and last) carry no
+// label: theirs comes from the dictionary, because the app wrote them, not the
+// user. Every stage the user creates carries its own label and is never
+// translated, same rule as habits and life areas.
+export interface LeadStage {
+  id: string;
+  label?: string; // absent on the two fixed stages
+}
+
+// Where a lead came from. Always user-owned once seeded, so the label is always
+// present and never translated.
+export interface LeadSource {
+  id: string;
+  label: string;
+}
+
 // Everything the owner wants to know about a lead beyond the free text. Kept as
 // a sub-object so plain notes never carry these fields. Every field is optional:
 // leads created before this existed have none of them and still render.
 export interface LeadDetails {
   name?: string; // who the lead is, the card title when present
   contact?: string; // phone, mail or WhatsApp, free text (see src/lib/leads.ts)
-  source?: string; // where the lead came from, free text with suggestions
+  source?: string; // LeadSource.id, or free text on leads created before sources existed
   nextStep?: string; // what has to happen for the deal to move
   nextStepDate?: string; // ISO day
 }

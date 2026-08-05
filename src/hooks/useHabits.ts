@@ -42,12 +42,18 @@ export function useHabits(lang: Lang) {
     [setLogs],
   );
 
-  // Completion rate over a set of days (e.g. the current month grid).
+  // Completion rate over the ELAPSED days of the given range, not all of them:
+  // dividing by the whole month makes every habit read ~6% on the 5th, which
+  // says more about the calendar than about the user. ISO days sort
+  // lexicographically, so one compare against today covers the three cases:
+  // past month (all days elapsed), current month (up to today inclusive),
+  // future month (none elapsed, hence the guard instead of a 0/0).
   const completionRate = useCallback(
     (habitId: string, days: string[]) => {
-      if (days.length === 0) return 0;
-      const hit = days.filter((d) => isDone(habitId, d)).length;
-      return hit / days.length;
+      const today = todayISO();
+      const elapsed = days.filter((d) => d <= today);
+      if (elapsed.length === 0) return 0;
+      return elapsed.filter((d) => isDone(habitId, d)).length / elapsed.length;
     },
     [isDone],
   );

@@ -1,17 +1,24 @@
-// Checks for src/lib/sync.ts — the pure logic of the GitHub backup. No deps, no
-// framework, no network: Node strips the types and imports the real module, so
-// this exercises the shipped code, not a copy.
+// Checks for the pure logic of the GitHub backup: src/lib/sync.ts (config,
+// encoding, newer-wins) plus the key selection in src/lib/storage.ts. No network,
+// no test framework: Node strips the types and imports the real modules, so this
+// exercises the shipped code, not a copy.
 //   node scripts/check-sync.mjs
 import assert from "node:assert/strict";
 
-// loadConfig/saveConfig touch localStorage. Six lines of Map beats a dependency.
+// loadConfig/saveConfig and the backup functions touch localStorage; importBackup
+// reloads the page. A Map and a no-op beat a dependency.
 const store = new Map();
 globalThis.localStorage = {
   getItem: (k) => (store.has(k) ? store.get(k) : null),
   setItem: (k, v) => store.set(k, String(v)),
   removeItem: (k) => store.delete(k),
   clear: () => store.clear(),
+  get length() {
+    return store.size;
+  },
+  key: (i) => [...store.keys()][i] ?? null,
 };
+globalThis.location = { reload: () => {} };
 
 const {
   DEFAULT_PATH,
@@ -28,6 +35,13 @@ const {
   statusToCode,
   toBase64,
 } = await import("../src/lib/sync.ts");
+
+// storage.ts also exports useLocalStorage, so this drags React in. Node resolves
+// it from node_modules without complaining, and it is worth it: the token
+// exclusion has to be asserted against the function the app really ships.
+const { STORAGE_KEYS, exportBackup, importBackup, isBackupKey } = await import(
+  "../src/lib/storage.ts"
+);
 
 let checks = 0;
 const check = (name, fn) => {
@@ -131,6 +145,81 @@ check("config and last-sync marker round trip through storage", () => {
 check("a corrupt config entry reads as 'not configured'", () => {
   store.set("lt.sync.config", "{not json");
   assert.equal(loadConfig(), null);
+  store.clear();
+});
+
+// ------------------------------------------------------- backup key selection
+// The backup file gets committed to a repo, and the GitHub token lives in
+// localStorage under lt.sync.config. Since the selection stopped being a closed
+// whitelist, these asserts are the guarantee that the token stays home.
+check("the GitHub token never leaves inside a backup", () => {
+  store.clear();
+  saveConfig(normalizeConfig({ token: "ghp_secret", repo: "me/tracker" }));
+  setLastSyncedAt("2026-08-05T10:00:00.000Z");
+  localStorage.setItem("lt.notes", JSON.stringify([{ id: "1", title: "maxi" }]));
+
+  const backup = exportBackup();
+  assert.deepEqual(Object.keys(JSON.parse(backup)), ["lt.notes"], "only non-sync lt.* keys may be exported");
+  assert.ok(!backup.includes("ghp_secret"), "the token ended up inside the file we push to the repo");
+  assert.ok(!backup.includes("lt.sync"), "no lt.sync key may show up in the backup, not even an empty one");
+  store.clear();
+});
+
+check("a key this build does not know still travels in both directions", () => {
+  store.clear();
+  localStorage.setItem("lt.futureFeature", JSON.stringify({ id: "x" }));
+  localStorage.setItem("lt.corrupt", "{not json");
+  const exported = JSON.parse(exportBackup());
+  assert.deepEqual(exported["lt.futureFeature"], { id: "x" }, "an unknown lt.* key must be forwarded, not dropped");
+  assert.ok(!("lt.corrupt" in exported), "an unparseable entry is skipped instead of killing the whole backup");
+
+  store.clear();
+  importBackup(JSON.stringify({ "lt.futureFeature": [1, 2] }));
+  assert.equal(localStorage.getItem("lt.futureFeature"), "[1,2]", "an unknown lt.* key must be imported, not discarded");
+  store.clear();
+});
+
+check("importBackup ignores sync keys arriving from the remote file", () => {
+  store.clear();
+  saveConfig(normalizeConfig({ token: "mine", repo: "me/tracker" }));
+  importBackup(
+    JSON.stringify({
+      "lt.sync.config": { token: "theirs", repo: "them/tracker", path: "x.json" },
+      "lt.leadStages": [{ id: "Nuevo" }],
+    }),
+  );
+  assert.equal(loadConfig().token, "mine", "a backup file must not be able to swap this device's token");
+  assert.equal(localStorage.getItem("lt.leadStages"), JSON.stringify([{ id: "Nuevo" }]));
+  store.clear();
+});
+
+check("isBackupKey excludes the whole lt.sync prefix, dot or no dot", () => {
+  assert.equal(isBackupKey("lt.notes"), true);
+  assert.equal(isBackupKey("lt.sync.config"), false);
+  assert.equal(isBackupKey("lt.sync.lastSyncedAt"), false);
+  // Deliberate: the exclusion carries no trailing dot, so it fails closed. A
+  // future key named lt.syncSomething stays home instead of gambling that nobody
+  // ever puts a secret one character short of the dotted namespace.
+  assert.equal(isBackupKey("lt.syncSomething"), false);
+  assert.equal(isBackupKey("theme"), false, "keys outside the lt. namespace are not ours to ship");
+  assert.equal(isBackupKey("other.lt.notes"), false);
+});
+
+check("this machine's own preferences stay on this machine", () => {
+  // lt.device is not about secrets, it is about scope: whether the sidebar is
+  // collapsed on a 1440p screen says nothing about a phone, and syncing it would
+  // let one device rearrange the other.
+  assert.equal(isBackupKey(STORAGE_KEYS.sidebarCollapsed), false, "a device preference got into the backup");
+  assert.equal(isBackupKey("lt.device.anythingElse"), false);
+  // Same fail-closed shape as the sync exclusion: no trailing dot.
+  assert.equal(isBackupKey("lt.deviceSomething"), false);
+
+  store.clear();
+  localStorage.setItem(STORAGE_KEYS.sidebarCollapsed, "true");
+  localStorage.setItem("lt.notes", JSON.stringify([{ id: "n1" }]));
+  const backup = JSON.parse(exportBackup());
+  assert.equal(STORAGE_KEYS.sidebarCollapsed in backup, false, "the sidebar preference was exported");
+  assert.deepEqual(backup["lt.notes"], [{ id: "n1" }], "real data must still travel");
   store.clear();
 });
 

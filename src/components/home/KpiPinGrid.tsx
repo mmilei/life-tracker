@@ -73,7 +73,7 @@ const CATALOG: Kpi[] = [
   },
 ];
 
-// Default board: one KPI per domain tab, so Home resume las 4 tabs de un vistazo.
+// Default board: one KPI per domain tab, so Home summarizes the other 4 tabs at a glance.
 const DEFAULT_IDS = ["highest-streak", "week-avg", "workouts-week", "active-leads"];
 const kpiById = (id: string) => CATALOG.find((k) => k.id === id);
 
@@ -105,7 +105,7 @@ export function KpiPinGrid() {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {t("home.indicators")}
         </h2>
         <Button variant="ghost" size="sm" onClick={() => setEditing((e) => !e)}>

@@ -35,9 +35,33 @@ function App() {
   return (
     <AppStoreProvider>
       <div className="flex min-h-dvh">
-        <Sidebar items={TABS} value={tab} onChange={setTab} className="sticky top-0" />
-        <main className="flex-1 overflow-x-hidden px-8 py-8 lg:px-12">
-          <div className="mx-auto w-full max-w-[1500px]">
+        {/* Sticky positioning lives inside Sidebar now: when it opens as an
+            overlay on a narrow window it has to switch to `fixed`, and a
+            position class coming down as a prop would fight that. */}
+        <Sidebar items={TABS} value={tab} onChange={setTab} />
+        {/* No overflow-x-hidden here. With a window that gets resized across a
+            wide range, hiding the overflow amputates whatever does not fit
+            without a scrollbar and without any other symptom, which is exactly
+            how a layout bug ships unnoticed. The two elements that are
+            legitimately wider than the viewport, the lead board and the habit
+            grid, scroll inside themselves. Anything else that overflows is a
+            bug, and now it says so. */}
+        <main className="min-w-0 flex-1 px-8 py-8 lg:px-12">
+          {/* NOTE: rem, not px, so the reading column scales with the root font
+              size like everything inside it. 93.75rem is a 1500px cap at the
+              16px root. The cap follows the scale, it does not pin a pixel
+              width.
+
+              `@container` sits here and not on <main> on purpose: this element
+              is the real content box (main's width ignores the max-width cap,
+              so past 1500px it would report room that does not exist). It is
+              what makes the sidebar collapse legible to the lead board and the
+              habit grid, which size themselves against their container instead
+              of the viewport: collapsing the rail widens this box, and their
+              container queries re-evaluate. A viewport-only change would leave
+              them unaware. Unnamed, so plain `@md:`-style queries anywhere
+              below resolve to it. */}
+          <div className="@container mx-auto w-full max-w-[93.75rem]">
             {tab === "week" ? (
               <WeekTab />
             ) : tab === "habits" ? (

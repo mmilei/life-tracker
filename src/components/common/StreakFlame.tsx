@@ -2,7 +2,7 @@ import { shouldShowBadge } from "@/lib/streaks";
 import { useT } from "@/store/AppStore";
 import { cn } from "@/lib/utils";
 
-// Signature element: the streak drawn as a flame with an Ember→Amber gradient
+// Signature element: the streak drawn as a flame with an Ember to Amber gradient
 // whose glow scales with consecutive days. Only shown from 5 days (product rule),
 // so it gates itself on shouldShowBadge and renders nothing below the threshold.
 export function StreakFlame({ count, className }: { count: number; className?: string }) {
@@ -21,13 +21,18 @@ export function StreakFlame({ count, className }: { count: number; className?: s
       <svg
         viewBox="0 0 24 24"
         className="size-4"
-        style={{ filter: `drop-shadow(0 0 ${blur}px rgba(255,106,61,${alpha}))` }}
+        style={{
+          filter: `drop-shadow(0 0 ${blur}px color-mix(in srgb, var(--color-ember) ${alpha * 100}%, transparent))`,
+        }}
         aria-hidden="true"
       >
         <defs>
+          {/* Same tokens as the ring on Home: the two used to be the old bright
+              hex pair while every bar and label beside them used the darkened
+              theme colors, which is what made Home look like two palettes. */}
           <linearGradient id="streak-flame-grad" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stopColor="#FF6A3D" />
-            <stop offset="100%" stopColor="#FFB020" />
+            <stop offset="0%" stopColor="var(--color-ember)" />
+            <stop offset="100%" stopColor="var(--color-amber)" />
           </linearGradient>
         </defs>
         <path
@@ -35,7 +40,7 @@ export function StreakFlame({ count, className }: { count: number; className?: s
           fill="url(#streak-flame-grad)"
         />
       </svg>
-      <span className="font-display text-xs font-semibold tabular-nums text-amber">{count}</span>
+      <span className="text-xs font-semibold tabular-nums text-amber">{count}</span>
     </span>
   );
 }

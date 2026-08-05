@@ -1,9 +1,17 @@
-import { createContext, useContext, useCallback, useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { useHabits } from "@/hooks/useHabits";
 import { useLifeAreas } from "@/hooks/useLifeAreas";
 import { useWeeklyRatings } from "@/hooks/useWeeklyRatings";
 import { useWorkouts } from "@/hooks/useWorkouts";
 import { useNotes } from "@/hooks/useNotes";
+import { useLeadConfig } from "@/hooks/useLeadConfig";
 import { useHomePins } from "@/hooks/useHomePins";
 import { STORAGE_KEYS, useLocalStorage } from "@/lib/storage";
 import { DEFAULT_LANG, t, type Lang, type Vars } from "@/lib/i18n";
@@ -19,6 +27,7 @@ interface AppStore {
   weeklyRatings: ReturnType<typeof useWeeklyRatings>;
   workouts: ReturnType<typeof useWorkouts>;
   notes: ReturnType<typeof useNotes>;
+  leadConfig: ReturnType<typeof useLeadConfig>;
   homePins: ReturnType<typeof useHomePins>;
   lang: Lang;
   setLang: (lang: Lang) => void;
@@ -43,12 +52,18 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   // request, no error — so the app is unchanged for anyone who never sets it up.
   useEffect(startSync, []);
 
+  const notes = useNotes(lang);
+  // Stable identity while the leads don't change, so the source migration inside
+  // useLeadConfig doesn't re-run on every render of the whole app.
+  const leadSourceValues = useMemo(() => notes.leads.map((l) => l.lead?.source), [notes.leads]);
+
   const store: AppStore = {
     habits: useHabits(lang),
     lifeAreas: useLifeAreas(lang),
     weeklyRatings: useWeeklyRatings(),
     workouts: useWorkouts(lang),
-    notes: useNotes(lang),
+    notes,
+    leadConfig: useLeadConfig(lang, leadSourceValues),
     homePins: useHomePins(),
     lang,
     setLang,

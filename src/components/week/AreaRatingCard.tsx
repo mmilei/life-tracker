@@ -34,7 +34,7 @@ export function AreaRatingCard({ area, score, onRate, onDelete }: AreaRatingCard
         <div className="flex items-center gap-1.5">
           <span
             className={cn(
-              "font-display text-lg leading-none tabular-nums",
+              "text-lg leading-none tabular-nums",
               rated ? scoreTone(value) : "text-muted-foreground",
             )}
           >

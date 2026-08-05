@@ -116,5 +116,19 @@
   }
   html {
     @apply font-sans;
+    /*
+      Back to the 16px default, on purpose.
+      This used to be 18px, a single knob that lifted type, padding, gaps and
+      widths together, because the app read as too small on a 1440p screen. The
+      knob was the wrong tool: the window is resized across a wide range, from
+      narrow (where it has to behave like mobile) to wide desktop, and one
+      constant cannot serve a range. It cost 12.5% of horizontal room exactly
+      where room was scarce, and it silently shifted every breakpoint, since rem
+      inside a media query always resolves against 16px while the content it
+      gates did not.
+      Anything that needs to be larger asks for it locally, where the tradeoff
+      is visible.
+    */
+    font-size: 16px;
   }
 }

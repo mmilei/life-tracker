@@ -158,7 +158,7 @@ export function GitHubSyncPanel() {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {t("sync.title")}
       </h2>
       <Card size="sm" className="gap-3 px-4">

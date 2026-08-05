@@ -15,11 +15,11 @@ export function WeeklySummaryCard() {
   return (
     <Card size="sm" className="gap-3 px-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-display text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {t("week.weekOf", { date: formatDayLong(ws) })}
         </span>
         {ratings.length > 0 && (
-          <Badge variant="secondary" className="font-display tabular-nums">
+          <Badge variant="secondary" className="tabular-nums">
             {(ratings.reduce((s, r) => s + r.score, 0) / ratings.length).toFixed(1)}
           </Badge>
         )}

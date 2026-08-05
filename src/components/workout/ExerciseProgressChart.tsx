@@ -72,18 +72,21 @@ export function ExerciseProgressChart({ workouts, exercises }: ExerciseProgressC
           {t("workout.chartEmpty")}
         </p>
       ) : (
-        <ResponsiveContainer width="100%" height={220}>
+        // NOTE: recharts takes plain numbers, so nothing here follows the root
+        // font size. Height, tick sizes and the axis gutter were bumped 12.5% by
+        // hand to match the rem-sized card and controls around them.
+        <ResponsiveContainer width="100%" height={248}>
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
               dataKey="date"
               tickFormatter={formatDayLong}
-              tick={{ fontSize: 11, fill: "var(--color-muted-text)" }}
+              tick={{ fontSize: 12, fill: "var(--color-muted-text)" }}
               stroke="var(--border)"
             />
             <YAxis
-              width={44}
-              tick={{ fontSize: 11, fill: "var(--color-muted-text)" }}
+              width={50}
+              tick={{ fontSize: 12, fill: "var(--color-muted-text)" }}
               stroke="var(--border)"
               unit={unit === "kg" ? "kg" : ""}
             />
@@ -97,7 +100,7 @@ export function ExerciseProgressChart({ workouts, exercises }: ExerciseProgressC
                 background: "var(--color-surface)",
                 border: "1px solid var(--border)",
                 borderRadius: 8,
-                fontSize: 12,
+                fontSize: 13,
               }}
             />
             <Line

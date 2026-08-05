@@ -5,11 +5,18 @@ import { getHighestStreak } from "@/lib/streaks";
 import { todayISO } from "@/lib/dates";
 
 // Adapted from KokonutUI's Apple Activity Card: its hardcoded MOVE/EXERCISE/STAND
-// rings are replaced by a single ring of today's habit-completion %, Ember→Amber
+// rings are replaced by a single ring of today's habit-completion %, Ember to Amber
 // (the "heat" metaphor), with StreakFlame at the center. Reuses only the SVG ring math.
-const SIZE = 200;
-const STROKE = 16;
-const RADIUS = (SIZE - STROKE) / 2;
+// NOTE: these numbers are viewBox units, not pixels. The ring keeps the dominant
+// size Home was designed around, but it gets it from a rem cap on its box instead
+// of a hardcoded px width: rem because the number and caption stacked inside are
+// rem-sized too, so ring and type keep the same ratio at any root font size, and
+// w-full because the window is resized down to phone widths, where a fixed 225px
+// ring plus padding is the entire screen. Stroke and radius are relative to VIEWBOX,
+// so both stay in proportion at every rendered size without a second knob.
+const VIEWBOX = 225;
+const STROKE = 18;
+const RADIUS = (VIEWBOX - STROKE) / 2;
 const CIRCUMFERENCE = RADIUS * 2 * Math.PI;
 
 export function StreakHero() {
@@ -24,15 +31,15 @@ export function StreakHero() {
   const offset = ((100 - pct) / 100) * CIRCUMFERENCE;
 
   return (
-    <div className="relative mx-auto grid place-items-center" style={{ width: SIZE, height: SIZE }}>
+    <div className="relative mx-auto grid aspect-square w-full max-w-[15rem] place-items-center">
       <svg
-        className="-rotate-90"
-        width={SIZE}
-        height={SIZE}
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        className="size-full -rotate-90"
+        viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
         aria-label={t("home.todayHabitsAria", { pct })}
       >
         <defs>
+          {/* Owner preference (2026-08-05): back to the original bright pair over
+              the darkened theme tokens, on this ring specifically. */}
           <linearGradient id="streak-hero-grad" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#FF6A3D" />
             <stop offset="100%" stopColor="#FFB020" />
@@ -40,16 +47,16 @@ export function StreakHero() {
         </defs>
         <circle
           className="text-muted/40"
-          cx={SIZE / 2}
-          cy={SIZE / 2}
+          cx={VIEWBOX / 2}
+          cy={VIEWBOX / 2}
           r={RADIUS}
           fill="none"
           stroke="currentColor"
           strokeWidth={STROKE}
         />
         <motion.circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
+          cx={VIEWBOX / 2}
+          cy={VIEWBOX / 2}
           r={RADIUS}
           fill="none"
           stroke="url(#streak-hero-grad)"

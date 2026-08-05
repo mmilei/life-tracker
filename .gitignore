@@ -28,3 +28,6 @@ dist-ssr
 
 # Loop state file: internal, never published
 LOOP-STATE.md
+
+# Cygwin/Git Bash crash dumps
+*.stackdump

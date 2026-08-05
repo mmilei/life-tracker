@@ -24,7 +24,7 @@ interface AddWorkoutDialogProps {
 }
 
 // Small labelled number field — native <input type="number"> gives us the
-// steppers for free (plan: nada que la plataforma ya resuelva).
+// steppers for free (rule of thumb: nothing the platform already solves).
 function NumberField({
   label,
   value,
