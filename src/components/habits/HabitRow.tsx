@@ -52,7 +52,7 @@ export function HabitRow({
           flame and the percentage. Both are context, not identity, and at 224px
           the label was eating more than half of a phone-sized screen. Name and
           colour dot stay because without them the row is anonymous. */}
-      <div className="sticky left-0 z-10 flex w-56 shrink-0 items-center gap-2 bg-card py-1.5 pr-3 @max-[640px]/habits:w-32 @max-[640px]/habits:pr-1">
+      <div className="sticky left-0 z-10 flex w-56 shrink-0 items-center gap-2 bg-card py-1.5 pr-3 pl-3 @max-[640px]/habits:w-32 @max-[640px]/habits:pr-1 @max-[640px]/habits:pl-2">
         <span
           className="size-2.5 shrink-0 rounded-full"
           style={{ backgroundColor: habit.color }}

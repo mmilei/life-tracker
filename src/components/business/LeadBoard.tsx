@@ -26,7 +26,7 @@ const COLUMN_WIDTH = "@lg/board:w-80";
 // that you would see a single column at a time, which is everything the kanban
 // gave you, gone. So it becomes a vertical list grouped by stage instead.
 const BOARD_LAYOUT =
-  "flex flex-col gap-6 @lg/board:flex-row @lg/board:items-start @lg/board:gap-4 @lg/board:overflow-x-auto @lg/board:pb-2";
+  "flex flex-col gap-4 @lg/board:flex-row @lg/board:items-start @lg/board:gap-4 @lg/board:overflow-x-auto @lg/board:pb-2 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]";
 
 // The "no filter" chip value. It has to be non-empty: ToggleGroup already uses
 // the empty string to mean "nothing selected", so an empty sentinel made the
@@ -258,14 +258,15 @@ export function LeadBoard({ leads, onUpdate, onRemove }: LeadBoardProps) {
           return (
             <section
               key={stage.id}
-              // The column is a region with a title, not a surface: the cards
-              // are the surfaces, and a card inside a card muddies both.
+              // Each stage is its own shaded tray now (bg-muted), so the gap
+              // between sections reads as the divider between columns instead
+              // of one continuous background behind the whole board.
               // NOTE: an empty stage gets no width in board layout, so it
               // collapses to its header and stops spending board space on
               // nothing. Stacked it is a one-line header saying "0", which is
               // worth keeping: it tells the owner the stage exists and is empty.
               className={cn(
-                "flex flex-col gap-3 @lg/board:shrink-0",
+                "flex flex-col gap-3 rounded-xl bg-muted/60 p-3 @lg/board:shrink-0",
                 items.length > 0 && COLUMN_WIDTH,
               )}
             >

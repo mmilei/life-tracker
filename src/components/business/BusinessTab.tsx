@@ -32,7 +32,7 @@ export function BusinessTab() {
           this app can count on.
           Nothing here is w-full: the toggle is w-fit by default and forcing it
           full width turned two labels into two huge grey bars. */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2">
         <ToggleGroup
           value={[view]}
           onValueChange={(v) => v[0] && setView(v[0] as "notes" | "leads")}
@@ -51,12 +51,14 @@ export function BusinessTab() {
           </ToggleGroupItem>
         </ToggleGroup>
 
-        <AddNoteDialog
-          noteTypes={noteTypes}
-          defaultTypeId={view === "leads" ? "lead" : firstNoteTypeId}
-          onAdd={addNote}
-        />
-        {view === "leads" && <LeadListsDialog />}
+        <div className="flex flex-wrap items-center gap-2">
+          <AddNoteDialog
+            noteTypes={noteTypes}
+            defaultTypeId={view === "leads" ? "lead" : firstNoteTypeId}
+            onAdd={addNote}
+          />
+          {view === "leads" && <LeadListsDialog />}
+        </div>
       </div>
 
       {view === "notes" ? (

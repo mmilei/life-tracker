@@ -92,7 +92,11 @@ export function HabitMonthGrid({
         ref={scrollerRef}
         onScroll={syncFade}
         className={cn(
-          "overflow-x-auto",
+          // Thin, border-coloured scrollbar instead of the OS default: a thick
+          // grey bar with arrow buttons read as a raw browser widget dropped
+          // into a soft, editorial page. scrollbar-color/-width are the CSS
+          // standard now (Firefox and Chromium both ship them), no plugin.
+          "overflow-x-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]",
           // The only hint that the month continues past the edge. Applied while
           // there is something left to scroll and not before, so a grid that
           // fits does not pretend to be cut off.
