@@ -44,11 +44,17 @@ export function TodayChecklist() {
                   >
                     {done && <Check className="size-4" strokeWidth={3} />}
                   </span>
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: h.color }}
-                    aria-hidden="true"
-                  />
+                  {h.emoji ? (
+                    <span className="shrink-0 text-sm leading-none" aria-hidden="true">
+                      {h.emoji}
+                    </span>
+                  ) : (
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: h.color }}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className={cn("truncate text-sm", done && "text-muted-foreground line-through")}>
                     {h.name}
                   </span>

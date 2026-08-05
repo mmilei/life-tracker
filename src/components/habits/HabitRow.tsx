@@ -10,6 +10,7 @@ interface HabitRowProps {
   days: string[]; // the month's ISO days, in order
   streak: number;
   completion: number; // 0..1 over the month's elapsed days, see useHabits.completionRate
+  delta: number | null; // completion-% points vs the previous month; null when the habit didn't exist yet then
   isDone: (date: string) => boolean;
   onToggle: (date: string) => void;
   onDelete: () => void;
@@ -37,6 +38,7 @@ export function HabitRow({
   days,
   streak,
   completion,
+  delta,
   isDone,
   onToggle,
   onDelete,
@@ -53,15 +55,30 @@ export function HabitRow({
           the label was eating more than half of a phone-sized screen. Name and
           colour dot stay because without them the row is anonymous. */}
       <div className="sticky left-0 z-10 flex w-56 shrink-0 items-center gap-2 bg-card py-1.5 pr-3 pl-3 @max-[640px]/habits:w-32 @max-[640px]/habits:pr-1 @max-[640px]/habits:pl-2">
-        <span
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: habit.color }}
-          aria-hidden="true"
-        />
+        {habit.emoji ? (
+          <span className="shrink-0 text-sm leading-none" aria-hidden="true">
+            {habit.emoji}
+          </span>
+        ) : (
+          <span
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: habit.color }}
+            aria-hidden="true"
+          />
+        )}
         <span className="truncate text-sm font-medium">{habit.name}</span>
         <StreakFlame count={streak} className="shrink-0 @max-[640px]/habits:hidden" />
-        <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground @max-[640px]/habits:hidden">
-          {Math.round(completion * 100)}%
+        <span className="ml-auto flex shrink-0 items-center gap-1 text-xs tabular-nums text-muted-foreground @max-[640px]/habits:hidden">
+          <span>{Math.round(completion * 100)}%</span>
+          {/* No badge at all when there's no prior month to compare against, or
+              when the two months tie: an omitted delta reads as "no signal",
+              which is honest, an "↑0"/"↓0" would read as a real change. */}
+          {delta !== null && delta !== 0 && (
+            <span className={delta > 0 ? "text-mint" : "text-destructive"}>
+              {delta > 0 ? "↑" : "↓"}
+              {Math.abs(delta)}
+            </span>
+          )}
         </span>
         {/* Same treatment destructive actions already get in LeadBoard: hidden
             by opacity, never by display, so the button keeps its slot in the tab

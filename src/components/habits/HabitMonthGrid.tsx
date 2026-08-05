@@ -8,6 +8,7 @@ import { HabitRow } from "./HabitRow";
 interface HabitMonthGridProps {
   habits: Habit[];
   days: string[]; // current month's ISO days
+  prevMonthDays: string[]; // previous calendar month's ISO days, for the D3 delta badge
   streaks: Record<string, number>;
   isDone: (habitId: string, date: string) => boolean;
   toggleLog: (habitId: string, date: string) => void;
@@ -30,6 +31,7 @@ interface HabitMonthGridProps {
 export function HabitMonthGrid({
   habits,
   days,
+  prevMonthDays,
   streaks,
   isDone,
   toggleLog,
@@ -37,6 +39,7 @@ export function HabitMonthGrid({
   removeHabit,
 }: HabitMonthGridProps) {
   const today = todayISO();
+  const lastPrevDay = prevMonthDays[prevMonthDays.length - 1] ?? "";
   const scrollerRef = useRef<HTMLDivElement>(null);
   const todayRef = useRef<HTMLSpanElement>(null);
   const [moreRight, setMoreRight] = useState(false);
@@ -131,20 +134,31 @@ export function HabitMonthGrid({
             </div>
           </div>
 
-          {habits.map((h) => (
-            <HabitRow
-              key={h.id}
-              habit={h}
-              days={days}
-              streak={streaks[h.id] ?? 0}
-              completion={completionRate(h.id, days)}
-              isDone={(d) => isDone(h.id, d)}
-              onToggle={(d) => toggleLog(h.id, d)}
-              onDelete={() => removeHabit(h.id)}
-              compactFrom={compactFrom}
-              compactTo={compactTo}
-            />
-          ))}
+          {habits.map((h) => {
+            const completion = completionRate(h.id, days);
+            // No badge unless the habit already existed for the whole previous
+            // month: comparing a partial or nonexistent history would just be a
+            // low number wearing a delta's clothes, not a real trend.
+            const hasPriorMonth = h.createdAt <= lastPrevDay;
+            const delta = hasPriorMonth
+              ? Math.round(completion * 100) - Math.round(completionRate(h.id, prevMonthDays) * 100)
+              : null;
+            return (
+              <HabitRow
+                key={h.id}
+                habit={h}
+                days={days}
+                streak={streaks[h.id] ?? 0}
+                completion={completion}
+                delta={delta}
+                isDone={(d) => isDone(h.id, d)}
+                onToggle={(d) => toggleLog(h.id, d)}
+                onDelete={() => removeHabit(h.id)}
+                compactFrom={compactFrom}
+                compactTo={compactTo}
+              />
+            );
+          })}
         </div>
       </div>
     </Card>
