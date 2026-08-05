@@ -99,7 +99,7 @@ export function HabitRow({
                 "size-[21px] shrink-0 rounded-full border transition-colors",
                 done
                   ? "border-transparent bg-mint hover:bg-mint/90"
-                  : "border-border/60 bg-transparent hover:bg-muted",
+                  : "border-border/60 bg-muted hover:bg-accent",
                 // No ring on today. A thick empty ring and a filled circle both
                 // read as state, but one of them is a date and the other is
                 // data. The header number already marks today in iris and
